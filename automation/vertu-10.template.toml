@@ -1,0 +1,71 @@
+version = 1
+id = "vertu-10-template"
+kind = "heartbeat"
+name = "VERTU English content portfolio"
+prompt = """
+Run the canonical VERTU English publishing pipeline in Discover-first
+auto_discovery mode.
+
+Configuration:
+- source_window_hours: 72 plus durable evergreen demand
+- candidate_target: at least 30
+- max_articles: 10; minimum_articles: 0
+- target_outcome: discover_and_search
+- trend_mode: realtime_hot
+- trend_markets: US, GB, AU, CA, AE, SA, SG, HK, IN
+- language: en-GB
+- delivery: local_draft
+- approval_required: true
+- production_publish: false
+- notification_target: configured_channel_and_codex
+
+Before acting:
+1. Read the complete installed editorial Skill and every active reference.
+2. Read the chain and performance-monitoring contracts.
+3. Load the Base schema map from the deployment-specific local configuration.
+4. Create or reconcile a deterministic execution row in the configured
+   Automation Runs table before any production mutation.
+
+Traffic and intelligence gates:
+- Query finalised 365-day and recent 28-day GSC Discover/Search evidence.
+- Consume the latest successful editorial-intelligence upstream.
+- Fetch official Google Trends Trending Now evidence for configured markets.
+- Validate durable and provisional learning priors before scoring.
+- Score at least 30 candidates with the deterministic traffic gate.
+- Select only demand-qualified candidates with score >=80, no hard veto and a
+  pre-draft Discover forecast PASS. NO_TOPIC is preferable to filler.
+
+Permanent routing boundary:
+- Never assign, draft, stage, sync or publish automatic content to news or a
+  /news/ path.
+
+Article gates:
+- Research current primary sources and live CMS inventory before outlining.
+- Fetch current product knowledge when product, service, privacy, craft, price,
+  availability, health or capability context is relevant.
+- Produce at least 1,500 substantive words unless a shorter complete treatment
+  is explicitly permitted; never pad.
+- Include one article-specific value object and reader-visible evidence.
+- Require contextual internal links and authoritative external evidence.
+- Run the human editorial pass, independent SEO QA and Discover readiness.
+- Generate an article-specific 16:9 hero only after both gates pass.
+- Use only configured institutional author IDs selected by expertise.
+
+Publication and handoff:
+- This public template is draft-only by default.
+- Production requires an operator-supplied standing approval profile, exact
+  run-scoped document IDs, fresh schema/revision checks and mutation preview.
+- Never retry an ambiguous production mutation blindly.
+- Require HTTP 200, exact canonical, non-News routing, verified hero,
+  authorship/schema and rendered-link reconciliation after publication.
+- Write the article, publication run and exact-revision QA handoff to the
+  configured Base tables and register 24h/72h/7d/28d monitoring checkpoints.
+
+Receipt:
+- Send a receipt only through the configured HTTPS notification adapter.
+- Resolve app ID, app secret, channel ID and endpoint from the environment or
+  operating-system secret store. Never store or print them.
+- Always emit a visible completion receipt, including no-op and blockers.
+"""
+status = "INACTIVE"
+rrule = "RRULE:FREQ=DAILY;BYHOUR=9;BYMINUTE=0"

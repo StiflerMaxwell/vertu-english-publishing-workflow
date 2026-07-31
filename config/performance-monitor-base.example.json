@@ -1,0 +1,102 @@
+{
+  "name": "Content and SEO operating loop",
+  "base_token": "${FEISHU_BASE_TOKEN}",
+  "url": "${FEISHU_BASE_URL}",
+  "time_zone": "Asia/Hong_Kong",
+  "identity": "user",
+  "tables": {
+    "automation_runs": {
+      "name": "Automation Runs",
+      "table_id": "${FEISHU_AUTOMATION_RUNS_TABLE_ID}",
+      "default_view_id": "${FEISHU_AUTOMATION_RUNS_VIEW_ID}"
+    },
+    "monitor_runs": {
+      "name": "Monitor Runs",
+      "table_id": "${FEISHU_MONITOR_RUNS_TABLE_ID}",
+      "default_view_id": "${FEISHU_MONITOR_RUNS_VIEW_ID}"
+    },
+    "articles": {
+      "name": "Article Assets",
+      "table_id": "${FEISHU_ARTICLES_TABLE_ID}",
+      "default_view_id": "${FEISHU_ARTICLES_VIEW_ID}"
+    },
+    "checkpoints": {
+      "name": "Checkpoint Reviews",
+      "table_id": "${FEISHU_CHECKPOINTS_TABLE_ID}",
+      "default_view_id": "${FEISHU_CHECKPOINTS_VIEW_ID}"
+    },
+    "experiments": {
+      "name": "Change Experiments",
+      "table_id": "${FEISHU_EXPERIMENTS_TABLE_ID}",
+      "default_view_id": "${FEISHU_EXPERIMENTS_VIEW_ID}"
+    },
+    "publication_runs": {
+      "name": "Publication Runs",
+      "table_id": "${FEISHU_PUBLICATION_RUNS_TABLE_ID}"
+    },
+    "qa_runs": {
+      "name": "QA Runs",
+      "table_id": "${FEISHU_QA_RUNS_TABLE_ID}"
+    },
+    "findings": {
+      "name": "Findings",
+      "table_id": "${FEISHU_FINDINGS_TABLE_ID}"
+    },
+    "skill_change_log": {
+      "name": "Skill Change Log",
+      "table_id": "${FEISHU_SKILL_CHANGE_LOG_TABLE_ID}",
+      "write_mode": "immutable_change_create_with_lifecycle_updates_by_record_id"
+    },
+    "content_review": {
+      "name": "Content Review",
+      "table_id": "${FEISHU_CONTENT_REVIEW_TABLE_ID}"
+    }
+  },
+  "article_key": "Article Key",
+  "checkpoint_write_mode": "idempotent_immutable_create_by_review_id",
+  "checkpoint_dedup": {
+    "business_key": "Review ID",
+    "prewrite_lookup": "exact_full_table_lookup_required",
+    "zero_matches": "create_then_readback",
+    "one_match": "verify_immutable_fields_and_reconcile_links_only",
+    "multiple_matches": "DUPLICATE_CHECKPOINT_BLOCKED",
+    "blind_create_retry_allowed": false
+  },
+  "monitor_run_write_mode": "immutable_create",
+  "article_write_mode": "upsert_after_key_lookup",
+  "experiment_write_mode": "create_then_lifecycle_update_by_record_id",
+  "learning_write_mode": "immutable_snapshot_plus_fingerprinted_active_pointer",
+  "learning_contract": {
+    "version": "performance-learning-v1",
+    "active_artifact": "${VERTU_PDCA_ROOT}/output/learning/active-performance-priors.json",
+    "release_gate": true,
+    "no_material_change_state": "NO_SKILL_CHANGE",
+    "evidence_levels": [
+      "OBSERVATION",
+      "CANDIDATE_PRIOR",
+      "DURABLE_PRIOR"
+    ],
+    "minimum_mature_articles": 3,
+    "minimum_publication_runs": 2,
+    "selection_adjustment_bounds": [-3, 3],
+    "eligibility_override_allowed": false
+  },
+  "automation_run_write_mode": "idempotent_upsert_by_execution_id_then_terminal_update",
+  "automation_audit_policy": {
+    "version": "canonical-base-audit-v1",
+    "execution_id": "automation_id + trigger_or_scheduled_time",
+    "start_state": "RUNNING",
+    "terminal_states": [
+      "SUCCESS",
+      "PARTIAL_SUCCESS",
+      "NO_ACTION",
+      "DATA_NOT_MATURE",
+      "SOURCE_BLOCKED",
+      "HUMAN_BLOCKED",
+      "FAILED"
+    ],
+    "required_for_every_invocation": true,
+    "production_mutation_requires_start_receipt": true,
+    "local_evidence_required": true
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "vertu-english-publishing-workflow",
+  "version": "3.8.1",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "test:python": "python3 -m unittest discover -s scripts/tests -p 'test_*.py'",
+    "validate": "python3 scripts/validate_bundle.py",
+    "notify:preview": "tsx scripts/vertu-vvv-notify.ts --preview",
+    "notify:send": "tsx scripts/vertu-vvv-notify.ts --send"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}
