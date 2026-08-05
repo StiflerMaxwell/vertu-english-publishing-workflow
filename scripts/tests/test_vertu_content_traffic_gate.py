@@ -180,7 +180,12 @@ class CandidateEvaluationTests(unittest.TestCase):
         self.assertTrue(result["eligible"])
         self.assertEqual(result["demand_verdict"], "STRONG")
         self.assertGreaterEqual(result["score"], 80)
-        self.assertEqual(result["score_source"], "computed_v3_5_0")
+        self.assertEqual(result["score_source"], traffic_gate.SCORE_SOURCE)
+        self.assertEqual(
+            result["score_contract_version"],
+            traffic_gate.TRAFFIC_GATE_CONTRACT_VERSION,
+        )
+        self.assertEqual(result["raw_score"], result["score"])
         self.assertTrue(result["hot_label_eligible"])
         self.assertIn("market_demand", result["score_breakdown"])
 
@@ -209,6 +214,264 @@ class CandidateEvaluationTests(unittest.TestCase):
         unavailable = result["source_statuses"]["keyword_planner"]
         self.assertEqual(unavailable["status"], "SOURCE_UNAVAILABLE")
         self.assertNotIn("score_100", unavailable)
+
+    def test_same_family_alias_and_supporting_signal_count_once(self):
+        candidate = valid_candidate(trend_class="EVERGREEN_SEARCH")
+        candidate["demand_signals"] = [
+            {
+                "provider": "google_ads_keyword_planner",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 70,
+                "evidence_ref": "artifact://keyword-planner",
+                "observed_at": NOW_ISO,
+                "metrics": {"average_monthly_searches": 1000},
+            },
+            {
+                "provider": "current_interest",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 95,
+                "evidence_ref": "artifact://keyword-planner#recent",
+                "observed_at": NOW_ISO,
+                "metrics": {
+                    "average_monthly_searches": 1000,
+                    "recent_month_searches": 1400,
+                },
+            },
+        ]
+
+        result = traffic_gate.evaluate_candidate(candidate)
+
+        self.assertEqual(
+            result["positive_demand_provider_families"],
+            ["google_ads_keyword_planner"],
+        )
+        self.assertEqual(
+            result["score_breakdown"]["market_demand"]["score_100"], 95
+        )
+        family = result["score_breakdown"]["market_demand"][
+            "provider_family_scores"
+        ]["google_ads_keyword_planner"]
+        self.assertEqual(family["selected_provider"], "current_interest")
+        current_interest = next(
+            row
+            for row in result["demand_signal_qualifications"]
+            if row["provider"] == "current_interest"
+        )
+        self.assertEqual(
+            current_interest["provider_family"], "google_ads_keyword_planner"
+        )
+        self.assertEqual(current_interest["demand_role"], "supporting_current")
+        self.assertFalse(current_interest["counts_for_search_demand"])
+        self.assertFalse(result["eligible"])
+        self.assertIn("insufficient_independent_demand_signals", result["vetoes"])
+
+    def test_supporting_current_signal_is_not_an_independent_search_provider(self):
+        candidate = valid_candidate(trend_class="EVERGREEN_SEARCH")
+        candidate["demand_signals"] = [
+            {
+                "provider": "gsc_candidate_query_page",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://gsc",
+                "observed_at": NOW_ISO,
+                "metrics": {"clicks": 3, "impressions": 100},
+            },
+            {
+                "provider": "current_event",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://editorial-current",
+                "observed_at": NOW_ISO,
+                "metrics": {"publisher_count": 5},
+            },
+        ]
+
+        result = traffic_gate.evaluate_candidate(candidate)
+
+        self.assertEqual(result["positive_demand_provider_families"], ["gsc"])
+        self.assertEqual(result["qualified_supporting_providers"], ["current_event"])
+        self.assertFalse(result["eligible"])
+        self.assertIn("insufficient_independent_demand_signals", result["vetoes"])
+
+    def test_tiny_gsc_sample_stays_available_but_does_not_count(self):
+        candidate = valid_candidate(trend_class="EVERGREEN_SEARCH")
+        candidate["demand_signals"] = [
+            {
+                "provider": "gsc_candidate_query_page",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://gsc-tiny",
+                "observed_at": NOW_ISO,
+                "metrics": {
+                    "recent_clicks": 0,
+                    "recent_impressions": 3,
+                    "annual_clicks": 44,
+                    "annual_impressions": 649,
+                },
+            },
+            {
+                "provider": "google_ads_keyword_planner",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://keyword-planner",
+                "observed_at": NOW_ISO,
+                "metrics": {"average_monthly_searches": 1000},
+            },
+        ]
+
+        result = traffic_gate.evaluate_candidate(candidate)
+
+        gsc = result["source_statuses"]["gsc_candidate_query_page"]
+        self.assertEqual(gsc["status"], "AVAILABLE")
+        self.assertTrue(gsc["positive"])
+        self.assertEqual(
+            gsc["metrics"],
+            {
+                "recent_clicks": 0,
+                "recent_impressions": 3,
+                "annual_clicks": 44,
+                "annual_impressions": 649,
+            },
+        )
+        self.assertEqual(gsc["qualification_status"], "INSUFFICIENT_SAMPLE")
+        self.assertEqual(
+            gsc["qualification_metrics"],
+            {
+                "clicks": 0.0,
+                "impressions": 3.0,
+                "metric_window": "recent_finalised",
+            },
+        )
+        self.assertFalse(gsc["effectively_positive"])
+        self.assertFalse(gsc["counts_for_search_demand"])
+        self.assertEqual(
+            result["positive_demand_provider_families"],
+            ["google_ads_keyword_planner"],
+        )
+        self.assertNotIn(
+            "gsc", result["score_breakdown"]["market_demand"]["provider_families"]
+        )
+        self.assertFalse(result["eligible"])
+
+    def test_valid_gsc_and_keyword_planner_are_independent_families(self):
+        candidate = valid_candidate(trend_class="EVERGREEN_SEARCH")
+        candidate["demand_signals"] = [
+            {
+                "provider": "gsc_candidate_query_page",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://gsc",
+                "observed_at": NOW_ISO,
+                "metrics": {"recent_clicks": 44, "recent_impressions": 649},
+            },
+            {
+                "provider": "keyword_planner",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://keyword-planner",
+                "observed_at": NOW_ISO,
+                "metrics": {"average_monthly_searches": 1000},
+            },
+        ]
+
+        result = traffic_gate.evaluate_candidate(candidate)
+
+        self.assertEqual(
+            result["positive_demand_provider_families"],
+            ["google_ads_keyword_planner", "gsc"],
+        )
+        self.assertEqual(result["demand_verdict"], "STRONG")
+        self.assertTrue(result["eligible"])
+
+    def test_annual_gsc_metrics_are_used_when_recent_window_is_absent(self):
+        candidate = valid_candidate(trend_class="EVERGREEN_SEARCH")
+        candidate["demand_signals"] = [
+            {
+                "provider": "gsc_candidate_query_page",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://gsc",
+                "observed_at": NOW_ISO,
+                "metrics": {"annual_clicks": 44, "annual_impressions": 649},
+            },
+            {
+                "provider": "google_ads_keyword_planner",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://keyword-planner",
+                "observed_at": NOW_ISO,
+                "metrics": {"average_monthly_searches": 1000},
+            },
+        ]
+
+        result = traffic_gate.evaluate_candidate(candidate)
+
+        gsc = result["source_statuses"]["gsc_candidate_query_page"]
+        self.assertEqual(gsc["qualification_status"], "QUALIFIED")
+        self.assertEqual(
+            gsc["qualification_metrics"]["metric_window"], "annual_finalised"
+        )
+        self.assertTrue(result["eligible"])
+
+    def test_keyword_planner_current_interest_retains_rising_role(self):
+        candidate = valid_candidate(trend_class="RISING_SEARCH")
+        candidate["demand_signals"] = [
+            {
+                "provider": "gsc_candidate_query_page",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 100,
+                "evidence_ref": "artifact://gsc",
+                "observed_at": NOW_ISO,
+                "metrics": {"recent_clicks": 44, "recent_impressions": 649},
+            },
+            {
+                "provider": "google_ads_keyword_planner",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 90,
+                "evidence_ref": "artifact://keyword-planner",
+                "observed_at": NOW_ISO,
+                "metrics": {"average_monthly_searches": 1000},
+            },
+            {
+                "provider": "current_interest",
+                "status": "AVAILABLE",
+                "positive": True,
+                "score_100": 95,
+                "evidence_ref": "artifact://keyword-planner.json#recent-vs-average",
+                "observed_at": NOW_ISO,
+                "metrics": {
+                    "recent_month_searches": 1400,
+                    "average_monthly_searches": 1000,
+                },
+            },
+        ]
+
+        result = traffic_gate.evaluate_candidate(candidate)
+
+        self.assertNotIn("unverified_rising_search_label", result["vetoes"])
+        self.assertEqual(
+            result["positive_demand_provider_families"],
+            ["google_ads_keyword_planner", "gsc"],
+        )
+        self.assertEqual(
+            result["score_breakdown"]["market_demand"][
+                "provider_family_scores"
+            ]["google_ads_keyword_planner"]["selected_provider"],
+            "current_interest",
+        )
+        self.assertTrue(result["eligible"])
 
     def test_realtime_hot_label_requires_verified_official_trends(self):
         candidate = valid_candidate()
@@ -550,7 +813,35 @@ class PortfolioSelectionTests(unittest.TestCase):
         )
 
         self.assertEqual(portfolio["selected"], [])
-        self.assertIn("forced_brand_insertion", portfolio["rejected"][0]["vetoes"])
+        rejected = portfolio["rejected"][0]
+        self.assertIn("forced_brand_insertion", rejected["vetoes"])
+        self.assertEqual(rejected["learning_adjustment"], 0)
+        self.assertEqual(rejected["selection_priority_score"], rejected["score"])
+        self.assertEqual(rejected["matched_learning_priors"], [])
+
+    def test_provisional_prior_is_not_applied_to_ineligible_candidate(self):
+        snapshot = realtime_snapshot()
+        candidate = valid_candidate(
+            cluster_id="preferred-cluster",
+            vetoes=["forced_brand_insertion"],
+        )
+        candidate["publication_run_id"] = snapshot["run_id"]
+        candidate["demand_signals"][1]["metrics"]["snapshot_fingerprint"] = snapshot[
+            "snapshot_fingerprint"
+        ]
+
+        portfolio = traffic_gate.select_portfolio(
+            [candidate],
+            max_articles=1,
+            realtime_trends_snapshot=snapshot,
+            live_source_verifications=live_verifications(snapshot),
+            provisional_learning_priors=self.provisional_priors(),
+        )
+
+        rejected = portfolio["rejected"][0]
+        self.assertEqual(rejected["learning_adjustment"], 0)
+        self.assertEqual(rejected["selection_priority_score"], rejected["score"])
+        self.assertEqual(rejected["matched_provisional_priors"], [])
 
     def test_provisional_prior_reorders_only_already_eligible_candidates(self):
         snapshot = realtime_snapshot()

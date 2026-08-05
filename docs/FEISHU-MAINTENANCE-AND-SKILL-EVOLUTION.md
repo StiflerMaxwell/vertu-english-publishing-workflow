@@ -436,7 +436,7 @@ The reference implementation uses:
 | Publication | Daily |
 | Independent QA and repair intake | Daily, after publication |
 | Performance pulse and due checkpoints | Daily |
-| Learning aggregation and release check | Every 48 hours |
+| Learning aggregation and release observation | Twice daily; mature promotion thresholds unchanged |
 
 Schedules are deployment configuration. They must preserve stage ordering and
 must not broaden publication authority.

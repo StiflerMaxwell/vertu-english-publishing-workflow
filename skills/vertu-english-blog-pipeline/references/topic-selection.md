@@ -1,4 +1,4 @@
-# Topic Selection Contract — Traffic Acquisition v3.8.0
+# Topic Selection Contract — Traffic Acquisition v3.11.0
 
 Topic selection is the highest-leverage stage. The goal is a current or durable reader need where VERTU can add a credible, distinctive perspective and where real performance evidence supports Discover or Search opportunity.
 
@@ -59,7 +59,7 @@ Every candidate must also declare `REALTIME_HOT`, `RISING_SEARCH` or `EVERGREEN_
 
 Separately record `EDITORIAL_BREAKOUT | CURRENT_CONFIRMED | NONE`. A verified editorial breakout can satisfy the current-interest portion of a Discover-first candidate, but it is never a Google demand provider and does not change the candidate's Google trend class.
 
-Do not accept a per-run `topic: 94` or similar final score. Calculate the final value with the reusable deterministic scorer under this v3.8.0 contract and pass the editorial artifacts whenever a breakout is declared. Missing sources remain explicit; missing required evidence rejects or holds the topic. Pass `--learning-priors` for validated durable evidence and `--provisional-learning-priors` for validated unexpired provisional evidence. Preserve the raw computed score separately from `selection_priority_score`; the combined learned adjustment is bounded to `-3..+3` and cannot change eligibility.
+Do not accept a per-run `topic: 94` or similar final score. Calculate the final value with the reusable deterministic scorer and require `score_source=computed_v3_10_0`; pass the editorial artifacts whenever a breakout is declared. Missing sources remain explicit; missing required evidence rejects or holds the topic. Pass `--learning-priors` for validated durable evidence and `--provisional-learning-priors` for validated unexpired provisional evidence. Preserve the raw computed score separately from `selection_priority_score`; the combined learned adjustment is bounded to `-3..+3` and cannot change eligibility.
 
 ## Traffic-acquisition scoring model
 
@@ -116,7 +116,7 @@ Reject regardless of score:
 
 If the incremental-value sentence is vague, reject or reframe.
 
-Two providers are independent only when they come from different acquisition evidence systems and do not merely repeat the same upstream estimate. Accepted positive Search-first providers are candidate-level finalised GSC query/page evidence, official Google Trends comparison evidence, and authorised Google Ads Keyword Planner evidence. SERP observations, Hermes/editorial velocity, social engagement, historical cluster adjacency and primary-source timeliness are supporting evidence, not independent Search-demand providers.
+Two providers are independent only when they come from different acquisition evidence systems and do not merely repeat the same upstream estimate. Accepted positive Search-first families are candidate-level finalised GSC query/page evidence, official Google Trends comparison evidence, and authorised Google Ads Keyword Planner evidence. Alias labels and derived `current_interest` values from the same Keyword Planner artifact count once. GSC counts only when the newest available finalised window reaches 3 clicks or 100 impressions; a smaller available recent window remains `INSUFFICIENT_SAMPLE` and cannot be replaced by an older window to pass. SERP observations, Hermes/editorial velocity, social engagement, historical cluster adjacency and primary-source timeliness are supporting evidence, not independent Search-demand providers.
 
 ## Topic brief
 

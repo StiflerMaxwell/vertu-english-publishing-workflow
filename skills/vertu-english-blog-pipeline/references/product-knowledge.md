@@ -2,9 +2,9 @@
 
 ## Canonical approved source
 
-Primary product knowledge is the Feishu Wiki node configured by
-`FEISHU_PRODUCT_KB_WIKI_TOKEN`. The token belongs in the runtime environment,
-not this repository.
+Primary VERTU product knowledge:
+
+`${VERTU_PRODUCT_KB_URL}`
 
 Title: `VERTU产品知识库（完整版）`
 
@@ -17,7 +17,7 @@ Use user identity for user-owned Feishu resources.
 ```bash
 lark-cli schema wiki.spaces.get_node
 lark-cli wiki spaces get_node \
-  --params "{\"token\":\"${FEISHU_PRODUCT_KB_WIKI_TOKEN}\"}" \
+  --params '{"token":"FMgPwM0kFi0sIzkSpkLc4QYsnKq"}' \
   --as user
 
 lark-cli docs +fetch --doc "<resolved_obj_token>" --as user
@@ -71,7 +71,7 @@ Create `product-context.json`:
 ```json
 {
   "knowledge_base": {
-    "wiki_token_env": "FEISHU_PRODUCT_KB_WIKI_TOKEN",
+    "wiki_token": "FMgPwM0kFi0sIzkSpkLc4QYsnKq",
     "revision_id": null,
     "edited_at": null,
     "fetched_at": null

@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.7.0 - 2026-08-05
+
+Changes:
+
+- Added a deterministic final-body safeguard for duplicate VERTU/Concierge integration sections.
+- Added batch-level meaningful H2–H4 fingerprint comparison with common Sources, verdict and Related VERTU headings excluded.
+- Added first-phase measurement of missing in-body evidence visuals for long buyer/comparison drafts; this remains a recommended, non-blocking warning.
+- Added the safeguard source to the workspace-independent QA policy hash and `qa-handoff-v1` unresolved-finding accounting.
+- Replayed the validator over 66 recent article artifacts: three duplicate-integration blockers, zero template-pair false positives and 66 body-visual warnings.
+
+Change control:
+
+- Old behaviour: duplicated brand-service sections and repeated batch outlines depended on manual detection, while body-visual absence was not measured.
+- New behaviour: exact final bodies and batch structure receive deterministic evidence before an authorising QA PASS.
+- Risk impact: closes measured editorial false negatives without making the unvalidated body-visual hypothesis a release gate.
+- Decision owner: project maintainer.
+- Default execution agent: Codex.
+- Implementation date: 2026-08-05.
+
+## 0.5.0 - 2026-08-04
+
+Source governance tasks:
+
+- `SEO-056`
+- `SEO-057`
+
+Changes:
+
+- Added policy-aware QA identity using Sanity Doc ID, Source Rev, QA Policy Hash and Evaluation Profile.
+- Added non-destructive legacy and duplicate QA identity audit states.
+- Added deterministic restricted-term context routing where literal matches are recall, not verdicts.
+- Added regression coverage for travel/transaction use of `treat`, affirmative medical claims and negation/disclaimer context.
+- Made the policy fingerprint workspace-path independent and expanded it to cover the deterministic classifier source.
+- Made affirmative medical context outrank coincident non-medical vocabulary and unrelated earlier-clause negation.
+
+Change control:
+
+- Old behaviour: free-text Skill versions could hide policy/profile drift, and a literal hard-red match could still be treated as a critical verdict.
+- New behaviour: policy bytes and evaluation profile define QA identity; restricted terms require an explicit context classification before a block.
+- Risk impact: removes a proven false positive without weakening affirmative medical, security, privacy or product-claim vetoes.
+- Decision owner: project maintainer.
+- Default execution agent: Codex.
+- Implementation date: 2026-08-04.
+
 ## 0.4.0 - 2026-07-13
 
 Source QA Runs:
@@ -21,7 +65,7 @@ Change control:
 - Old behaviour: the repair automation stopped at local proposal packs and could not represent the intended repair-and-publish workflow.
 - New behaviour: the QA skill remains an independent non-publishing gate while a separate Feishu-authorised executor may repair the actual Draft and publish only after the new QA Run passes.
 - Risk impact: enables the requested automation without allowing the QA gate itself to self-approve or rewrite historical QA evidence.
-- Decision owner: Max.
+- Decision owner: project maintainer.
 - Implementation date: 2026-07-13.
 
 ## 0.3.1 - 2026-07-13
@@ -41,7 +85,7 @@ Change control:
 - Old behaviour: literal URL comparison could report two live, indexed pages as absent from the sitemap.
 - New behaviour: follow redirects and compare normalised final URLs.
 - Risk impact: removes a discovery false positive without changing content scores or Sanity permissions.
-- Decision owner: Max.
+- Decision owner: project maintainer.
 - Implementation date: 2026-07-13.
 
 ## 0.3.0 - 2026-07-13
@@ -65,7 +109,7 @@ Change control:
 - Old behaviour: the recent-publication query could rely on the public Sanity result and undercount protected published documents.
 - New behaviour: authenticated read-only discovery is required, followed by live URL and sitemap verification.
 - Risk impact: reduces false negatives in batch QA without expanding Sanity write permissions.
-- Decision owner: Max.
+- Decision owner: project maintainer.
 - Implementation date: 2026-07-13.
 
 ## 0.2.0 - 2026-07-10

@@ -124,6 +124,10 @@ Include a descriptive H1, slug, SEO title, meta description, excerpt, clean hier
 
 Add FAQ only when real recurring questions exist. Do not add tables, lists, dates, or word count merely because a generic template expects them.
 
+Use at most one article-specific VERTU/Concierge integration section. Navigation headings such as `Related VERTU reading` do not count, but two explanatory brand/service sections do. Consolidate duplicate integration before handoff.
+
+The final batch must not repeat a materially identical meaningful H2–H4 sequence after normalising years, punctuation and compared entities. Common navigation and evidence headings such as Sources, Final verdict and Related VERTU reading are excluded from the fingerprint; their presence alone must not create a template finding.
+
 ## Depth and article-specific value
 
 | Content type | Normal range | Required value object |
@@ -134,6 +138,8 @@ Add FAQ only when real recurring questions exist. Do not add tables, lists, date
 | Pillar / collector guide | 2,200–3,200 words | selection methodology, product/brand matrix, and collector or ownership guidance |
 
 These are not Google ranking targets. They stop thin drafts from passing when the topic requires depth. Never pad to reach a number. Every article must contain at least one article-specific value object. Repeating the same FAQ, four-step framework, or three-item list across a batch fails the editorial pass.
+
+For buyer/comparison work at or above 1,500 substantive words, plan at least one descriptive in-body evidence visual when a factual, rights-safe visual adds decision value. The hero image does not count. Until a controlled experiment establishes a release threshold, absence is recorded as `BODY_VISUAL_MISSING` warning rather than a hard failure; an explicit article-specific exception is preferable to decorative imagery.
 
 ## Discover preview contract
 

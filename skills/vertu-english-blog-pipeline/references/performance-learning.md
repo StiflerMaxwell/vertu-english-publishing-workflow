@@ -12,6 +12,12 @@ Use this contract for every automatic topic-selection run and every scheduled co
 
 Never promote a planned checkpoint, `DATA_NOT_MATURE`, `SOURCE_BLOCKED`, missing execution timestamp, null future metric, unverified prose summary or one isolated spike.
 
+## Canonical learning context
+
+Join performance evidence to publishing context by `publication_run_id` plus `article_key` or slug. Current production metadata comes from `candidate-scores.json.selected`, `cluster-support.json`, `run-summary.json` and `handoff.json`; `traffic-demand.json.candidates` may enrich only a slug proven published by the same run. Preserve cluster, intent, outcome lane, trend class, section and portfolio bucket in every new checkpoint.
+
+An executed checkpoint with partial historical context may remain an observation. It may not create broad section, trend-class or portfolio-bucket priors. Runs through 2026-07-11 with missing first-generation artifacts use `LEGACY_EVIDENCE_EXCEPTION` and remain outside promotion evidence unless their exact records are verifiably repaired without inference.
+
 ## User-approved editorial strategies
 
 Keep explicit user strategy separate from governed performance priors.
@@ -52,7 +58,7 @@ Require for provisional priors:
 - an activation time, expiry time and rollback condition;
 - a maximum absolute adjustment of one for 72-hour evidence or two for 7-day evidence;
 - UTC activation and expiry timestamps; the prior is ignored when `now >= expires_at`;
-- expiry after eight days unless a new governed 48-hour run refreshes it with still-valid evidence.
+- expiry after eight days unless a new governed twice-daily run refreshes it with still-valid evidence.
 
 If validation fails, record `LEARNING_PRIORS_INVALID` or `PROVISIONAL_LEARNING_PRIORS_INVALID` and continue without the affected layer. Never rebuild priors from a Markdown summary or a previous model's claims.
 
@@ -77,9 +83,9 @@ A prior may not:
 - authorise publication or Sanity mutation;
 - encourage cloning a successful page.
 
-## 48-hour promotion check
+## Twice-daily promotion check
 
-Run at least once every 48 hours after the daily monitor:
+Run twice daily after the corresponding monitoring pulse. Same-day GA4/Discover acceleration is recorded immediately as an observation, but early data does not lower maturity thresholds:
 
 ```bash
 python3 ${VERTU_PDCA_ROOT}/scripts/vertu_content_learning_flywheel.py \
@@ -95,6 +101,8 @@ The job must:
 - deduplicate retries by article and checkpoint, keeping the latest executed evidence;
 - report every rejected input by reason;
 - aggregate same-age Search, Discover and GA4 outcomes by cluster, intent, title pattern, trend class, section and portfolio bucket;
+- read the current production artifact shapes and report complete versus partial learning-context counts;
+- preserve the raw monitor classification and derive learning direction deterministically; packaging, CTR, coverage, ranking and intent opportunities are negative observations, not neutral missing data;
 - aggregate `PREMIUM_DECISION_CORE | ADJACENT | EXPLORATION` separately and retain mass-recognisability, decision-intent and niche-risk boundaries;
 - generate expiring provisional priors only from recent repeated mature 72-hour or 7-day evidence;
 - expire or replace provisional priors whose evidence or activation window is stale;
@@ -104,25 +112,25 @@ The job must:
 - write `NO_PROMOTION` when neither a provisional nor durable rule qualifies, write `NO_DURABLE_LESSON` when only provisional evidence qualifies, and preserve the last valid durable `ACTIVE` pointer unchanged;
 - write one canonical Base `自动化运行日志` row and one `Skill Change Log` row per proposed, activated, expired, rejected or rolled-back change.
 
-## 48-hour skill release
+## Twice-daily skill release
 
-On every 48-hour run:
+On every twice-daily run:
 
 1. collect the preceding 35 days of daily pulses plus all mature 72h/7d/28d evidence, and retain a 90-day comparison window;
 2. compare active priors with holdout cohorts and verified experiments;
 3. expire or roll back reversed priors;
 4. consolidate repeated structural proposals;
 5. run scorer tests, skill validation and a historical replay;
-6. bump the patch version only for material data/wording/process changes that pass all checks, or the minor version for an explicitly approved contract change;
-7. record old rule, new rule, evidence, replay result, implementation time, active skill version and rollback condition in `Skill Change Log`.
+6. for every material Skill or governing-process proposal, build `skill-scorecard-input.json` and run `scripts/vertu_skill_evolution_scorecard.py` under `skill-evolution-scorecard.md`;
+7. treat its structural diagnostic as triage only, require same-rubric paired comparison for keep/revert, and require mature D+28 or verified-experiment production outcomes for traffic-affecting promotion;
+8. bump the patch version only for material data/wording/process changes that pass all checks, or the minor version for an explicitly approved contract change;
+9. record old rule, new rule, evidence, scorecard fingerprint and decision, replay result, implementation time, active skill version and rollback condition in `Skill Change Log`.
 
 If no material and replay-safe change qualifies, preserve the current Skill version and record `NO_SKILL_CHANGE`; never create a cosmetic version bump. Data-only provisional or durable priors and non-structural operational clarifications may activate automatically when every deterministic gate passes. Structural changes to rubric weights, thresholds, vetoes, source authority, publication authority or QA boundaries remain proposals until explicitly approved.
 
 ## Canonical Base
 
-Use only the configured canonical Base and its `Skill Change Log` table. Resolve
-both identifiers from the deployment-specific schema map; never embed them in
-the Skill.
+Use only `VERTU 内容与 SEO 运营闭环`, table `Skill Change Log` (`${FEISHU_SKILL_CHANGE_LOG_TABLE_ID}`).
 
 Record:
 
@@ -132,6 +140,8 @@ Record:
 - old rule and proposed/new rule;
 - bounded adjustment;
 - replay result;
+- structural diagnostic score, paired verdict, production outcome score and release decision;
+- scorecard fingerprint and immutable local scorecard path;
 - state: proposed, accepted, implemented or rejected;
 - skill version, activation time, expiry and rollback condition.
 

@@ -22,9 +22,26 @@ NEGATIVE_CLASSES = {
     "UNDERPERFORMER",
     "NO_DEMAND",
     "CTR_PACKAGING",
+    "DISCOVER_PACKAGING_OPPORTUNITY",
+    "SEARCH_CTR_OPPORTUNITY",
+    "CONTENT_COVERAGE_OPPORTUNITY",
+    "SEARCH_INTENT_OPPORTUNITY",
+    "RANKING_OPPORTUNITY",
     "ENGAGEMENT_GAP",
     "TECHNICAL_FAILURE",
 }
+CONTEXT_SPECIFIC_SCOPE_FIELDS = (
+    "cluster_id",
+    "intent_key",
+    "outcome_lane",
+)
+CONTEXT_COMPLETE_FIELDS = (
+    "publication_run_id",
+    "cluster_id",
+    "intent_key",
+    "outcome_lane",
+    "trend_class",
+)
 PROMOTION_MIN_ARTICLES = 3
 PROMOTION_MIN_RUNS = 2
 PROVISIONAL_EVIDENCE_MAX_AGE_DAYS = 14
@@ -121,47 +138,65 @@ def checkpoint_paths(root: Path) -> Iterable[Path]:
 
 def metadata_index(root: Path) -> Dict[str, Dict[str, Any]]:
     index: Dict[str, Dict[str, Any]] = {}
+    field_priority: Dict[str, Dict[str, int]] = defaultdict(dict)
 
-    def merge(slug: str, values: Dict[str, Any]) -> None:
+    def merge(slug: str, values: Dict[str, Any], priority: int, source: str) -> None:
         if not slug:
             return
         current = index.setdefault(slug, {})
         for key, value in values.items():
-            if value not in (None, "", [], {}):
+            if (
+                value not in (None, "", [], {})
+                and priority >= field_priority[slug].get(key, -1)
+            ):
                 current[key] = value
+                field_priority[slug][key] = priority
+        sources = current.setdefault("metadata_sources", [])
+        if source not in sources:
+            sources.append(source)
 
-    for path in root.glob("**/completion-report.json"):
+    def run_id(payload: Dict[str, Any], path: Path) -> str:
+        return str(
+            payload.get("publication_run_id")
+            or payload.get("run_id")
+            or payload.get("execution_id")
+            or path.parent.name
+        ).strip()
+
+    def candidate_cluster_map(run_path: Path) -> Dict[str, str]:
+        path = run_path / "cluster-support.json"
+        if not path.exists():
+            return {}
+        try:
+            payload = load_json(path)
+        except (OSError, json.JSONDecodeError):
+            return {}
+        rows = payload.get("candidates") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            return {}
+        return {
+            str(row.get("candidate_id") or "").strip(): str(
+                row.get("cluster") or ""
+            ).strip()
+            for row in rows
+            if isinstance(row, dict)
+            and str(row.get("candidate_id") or "").strip()
+            and str(row.get("cluster") or "").strip()
+        }
+
+    # Candidate demand rows are useful enrichment, but include unselected rows and
+    # therefore have the lowest authority.
+    for path in sorted(root.glob("**/traffic-demand.json")):
         try:
             payload = load_json(path)
         except (OSError, json.JSONDecodeError):
             continue
-        rows = payload.get("articles") if isinstance(payload, dict) else None
+        rows = None
+        if isinstance(payload, dict):
+            rows = payload.get("selected") or payload.get("candidates")
         if not isinstance(rows, list):
             continue
-        run_id = str(payload.get("publication_run_id") or payload.get("run_id") or path.parent)
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            slug = str(row.get("slug") or "").strip()
-            if slug:
-                merge(slug, {
-                    "publication_run_id": run_id,
-                    "cluster_id": row.get("cluster_id"),
-                    "trend_class": row.get("trend_class"),
-                    "section": row.get("section"),
-                    "outcome_lane": row.get("traffic_mode") or row.get("outcome_lane"),
-                    "intent_key": row.get("intent_key"),
-                    "portfolio_bucket": row.get("portfolio_bucket"),
-                })
-
-    for path in root.glob("**/traffic-demand.json"):
-        try:
-            payload = load_json(path)
-        except (OSError, json.JSONDecodeError):
-            continue
-        rows = payload.get("selected") if isinstance(payload, dict) else None
-        if not isinstance(rows, list):
-            continue
+        clusters = candidate_cluster_map(path.parent)
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -176,19 +211,135 @@ def metadata_index(root: Path) -> Dict[str, Dict[str, Any]]:
                     gsc_cluster = metrics.get("cluster")
                     if gsc_cluster:
                         break
-            merge(slug, {
-                "publication_run_id": (
-                    row.get("publication_run_id")
-                    or payload.get("publication_run_id")
-                    or path.parent.name
-                ),
-                "cluster_id": row.get("cluster_id") or gsc_cluster,
-                "trend_class": row.get("trend_class"),
-                "section": row.get("section"),
-                "outcome_lane": row.get("outcome_lane"),
-                "intent_key": row.get("intent_key"),
-                "portfolio_bucket": row.get("portfolio_bucket"),
-            })
+            merge(
+                slug,
+                {
+                    "publication_run_id": row.get("publication_run_id")
+                    or run_id(payload, path),
+                    "candidate_id": row.get("candidate_id"),
+                    "cluster_id": row.get("cluster_id")
+                    or clusters.get(str(row.get("candidate_id") or ""))
+                    or row.get("audience_fit_lane")
+                    or gsc_cluster,
+                    "trend_class": row.get("trend_class"),
+                    "section": row.get("section"),
+                    "outcome_lane": row.get("outcome_lane"),
+                    "intent_key": row.get("intent_key")
+                    or row.get("decision_intent")
+                    or row.get("query_intent_boundary"),
+                    "portfolio_bucket": row.get("portfolio_bucket"),
+                },
+                priority=10,
+                source="traffic-demand",
+            )
+
+    # Preserve compatibility with first-generation publication packages.
+    for path in sorted(root.glob("**/completion-report.json")):
+        try:
+            payload = load_json(path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        rows = payload.get("articles") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            continue
+        publication_run_id = run_id(payload, path)
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            slug = str(row.get("slug") or "").strip()
+            if slug:
+                merge(
+                    slug,
+                    {
+                        "publication_run_id": publication_run_id,
+                        "candidate_id": row.get("candidate_id"),
+                        "cluster_id": row.get("cluster_id"),
+                        "trend_class": row.get("trend_class"),
+                        "section": row.get("section"),
+                        "outcome_lane": row.get("traffic_mode")
+                        or row.get("outcome_lane"),
+                        "intent_key": row.get("intent_key"),
+                        "portfolio_bucket": row.get("portfolio_bucket"),
+                    },
+                    priority=20,
+                    source="completion-report",
+                )
+
+    # Current delivery truth: only articles present here reached the run result.
+    for path in sorted(root.glob("**/run-summary.json")):
+        try:
+            payload = load_json(path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        rows = payload.get("articles") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            slug = str(row.get("slug") or "").strip()
+            merge(
+                slug,
+                {
+                    "publication_run_id": row.get("publication_run_id")
+                    or run_id(payload, path),
+                    "candidate_id": row.get("candidate_id"),
+                    "cluster_id": row.get("cluster_id"),
+                    "trend_class": row.get("trend_class"),
+                    "section": row.get("section"),
+                    "outcome_lane": row.get("outcome_lane"),
+                    "intent_key": row.get("intent_key"),
+                    "portfolio_bucket": row.get("portfolio_bucket"),
+                },
+                priority=30,
+                source="run-summary",
+            )
+
+    # Current selection truth has the richest governed topic context.
+    for path in sorted(root.glob("**/candidate-scores.json")):
+        try:
+            payload = load_json(path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        rows = payload.get("selected") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            continue
+        clusters = candidate_cluster_map(path.parent)
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            slug = str(row.get("slug") or "").strip()
+            candidate_id = str(row.get("candidate_id") or "").strip()
+            forecast = row.get("predraft_discover_forecast") or {}
+            merge(
+                slug,
+                {
+                    "publication_run_id": row.get("publication_run_id")
+                    or run_id(payload, path),
+                    "candidate_id": candidate_id,
+                    "cluster_id": row.get("cluster_id")
+                    or clusters.get(candidate_id)
+                    or row.get("audience_fit_lane")
+                    or forecast.get("historical_cluster"),
+                    "trend_class": row.get("trend_class"),
+                    "section": row.get("section"),
+                    "outcome_lane": row.get("outcome_lane"),
+                    "intent_key": row.get("intent_key")
+                    or row.get("decision_intent")
+                    or row.get("query_intent_boundary"),
+                    "portfolio_bucket": row.get("portfolio_bucket"),
+                },
+                priority=40,
+                source="candidate-scores:selected",
+            )
+
+    for values in index.values():
+        values["learning_context_version"] = "learning-context-v1"
+        values["learning_context_status"] = (
+            "COMPLETE"
+            if all(str(values.get(field) or "").strip() for field in CONTEXT_COMPLETE_FIELDS)
+            else "PARTIAL"
+        )
     return index
 
 
@@ -301,7 +452,9 @@ def collect_checkpoints(root: Path) -> Tuple[List[Dict[str, Any]], List[Dict[str
             "learning_level": CHECKPOINT_LEVEL[checkpoint],
             "executed_at": executed.isoformat().replace("+00:00", "Z"),
             "classification": _classification(row),
+            "raw_classification": _classification(row),
             "direction": _direction(_classification(row)),
+            "learning_direction": _direction(_classification(row)),
             "path": str(path),
             "gsc": row.get("gsc"),
             "ga4_status": (row.get("ga4") or {}).get("status"),
@@ -323,14 +476,12 @@ def collect_checkpoints(root: Path) -> Tuple[List[Dict[str, Any]], List[Dict[str
 
 
 def _scope_pairs(row: Dict[str, Any]) -> Iterable[Tuple[str, str]]:
-    for field in (
-        "cluster_id",
-        "trend_class",
-        "section",
-        "outcome_lane",
-        "intent_key",
-        "portfolio_bucket",
-    ):
+    if not str(row.get("publication_run_id") or "").strip():
+        return
+    fields = list(CONTEXT_SPECIFIC_SCOPE_FIELDS)
+    if row.get("learning_context_status") == "COMPLETE":
+        fields.extend(("trend_class", "section", "portfolio_bucket"))
+    for field in fields:
         value = str(row.get(field) or "").strip()
         if value:
             yield field, value
@@ -523,6 +674,37 @@ def build_snapshot(root: Path, execution_id: str) -> Tuple[Dict[str, Any], Dict[
             else "NO_PROMOTION"
         ),
         "accepted_checkpoint_count": len(checkpoints),
+        "learning_context_version": "learning-context-v1",
+        "learning_context_completeness": {
+            "complete": sum(
+                row.get("learning_context_status") == "COMPLETE"
+                for row in checkpoints
+            ),
+            "partial": sum(
+                row.get("learning_context_status") != "COMPLETE"
+                for row in checkpoints
+            ),
+            "with_publication_run_id": sum(
+                bool(str(row.get("publication_run_id") or "").strip())
+                for row in checkpoints
+            ),
+            "with_cluster_id": sum(
+                bool(str(row.get("cluster_id") or "").strip())
+                for row in checkpoints
+            ),
+            "with_intent_key": sum(
+                bool(str(row.get("intent_key") or "").strip())
+                for row in checkpoints
+            ),
+            "with_trend_class": sum(
+                bool(str(row.get("trend_class") or "").strip())
+                for row in checkpoints
+            ),
+            "with_outcome_lane": sum(
+                bool(str(row.get("outcome_lane") or "").strip())
+                for row in checkpoints
+            ),
+        },
         "accepted_by_level": {
             level: sum(row["learning_level"] == level for row in checkpoints)
             for level in sorted(set(CHECKPOINT_LEVEL.values()))

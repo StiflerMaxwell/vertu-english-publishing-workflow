@@ -1,16 +1,16 @@
 ---
 name: vertu-seo-publish-gate
-version: 0.4.0
 description: VERTU 海外官网 SEO 内容发布前 QA Gate。用于审核 QuickCreator / AI / 人工草稿，输出 PASS / FIX / BLOCK、具体修改意见、SEO 建议、Sanity Patch Plan 和写入权限报告。授权后只允许写入 Sanity Draft，禁止直接 Publish。
-platforms:
-  - openclaw
-  - hermes
-  - lobster
-owner: VERTU Overseas Web
-risk_level: controlled
+metadata:
+  version: "0.7.0"
+  platforms: "openclaw, hermes, lobster"
+  owner: "VERTU Overseas Web"
+  risk_level: "controlled"
 ---
 
 # VERTU SEO Publish Gate
+
+Current policy version: `0.7.0`.
 
 ## 1. Skill Purpose
 
@@ -29,6 +29,7 @@ This skill must produce:
 6. Sanity Write Permission Report
 7. Writer Execution Result
 8. QA Tracking Writeback Result
+9. Editorial Safeguards Result
 
 The skill must never directly publish content.
 
@@ -62,11 +63,26 @@ Expected input may include:
 ```yaml
 qa_run_id: string
 skill_version: string
+qa_policy_id: string
+qa_policy_version: string
+qa_policy_hash: string
+evaluation_profile: official_site_relaxed | official_site_standard | official_site_strict
+qa_handoff_contract_version: qa-handoff-v1
+producer_skill_id: vertu-english-blog-pipeline
+producer_skill_version: string
+publication_run_id: string
+article_key: string
+draft_bundle_sha256: string
+source_identity_type: artifact_bundle | sanity_draft_revision | published_revision
+release_gate_role: preflight | prepublish | postpublish_audit
+qa_record_id: optional string before write; required in returned handoff
 review_round: integer
 parent_qa_run_id: string | null
 content_source: QuickCreator | Sanity Draft | Markdown | Manual
 content_type: blog | guide | newsroom | product_story | ai_tools | craft_heritage | landing_page
 market: global | cn | eu | uk | ch
+markets: optional ISO 3166-1 alpha-2 list; preferred for production-chain runs
+language: en-GB
 target_language: UK English
 target_keyword: string
 secondary_keywords: string[]
@@ -184,6 +200,10 @@ Every real QA run must be traceable.
 - If a configured tracker is available, write one QA Run record and one record per finding.
 - The QA Run must include `qa_run_id`, `skill_version`, `review_round`, `article_url`, Sanity document ID, source revision, score, decision, risk, Patch Action, and Critical Veto result.
 - Each finding must include its own stable patch/finding ID, evidence label, location, before/after copy, handling status, and link back to the QA Run.
+- Every new QA Run must record `qa_policy_id`, `qa_policy_version`, `qa_policy_hash`, and `evaluation_profile`. Its deterministic identity is `Sanity Doc ID + Source Rev + QA Policy Hash + Evaluation Profile`; free-text `Skill Version` alone is not an identity key. The workspace-path-independent hash sources are defined by the shared production-chain rule below.
+- Every new production-chain QA Run must also follow `${VERTU_PDCA_ROOT}/contracts/VERTU-QA-Handoff-Contract.md`. The policy hash covers, in order, `SKILL.md`, `references/qa-tracking-contract.md`, `scripts/vertu_qa_policy.py`, `scripts/vertu_editorial_safeguards.py`, and that shared handoff contract. Record the producer version, draft-bundle fingerprint, release-gate role and exact source identity; emit the immutable Base QA record ID and `qa_result_fingerprint` after persistence.
+- `preflight` evaluates the fingerprinted artifact bundle. `prepublish` evaluates the exact Sanity Draft revision. `postpublish_audit` reconciles the exact published revision. QA remains independent and never performs the publication mutation.
+- Historical rows without provable shared identity remain `LEGACY_UNVERIFIED`; never relabel them current or reuse them to authorise a new release.
 - A changed Sanity `_rev` or materially changed draft creates a **new** QA Run. Link it with `parent_qa_run_id`; never overwrite the previous score or findings.
 - Resolve `article_url` from an explicit canonical URL first. Otherwise derive it from verified routing metadata such as `section + slug`, then confirm the page is reachable. Never invent an unverified URL.
 - If tracker writeback is unavailable, still emit a complete writeback payload and report `tracking_status: not_written` with the reason.
@@ -374,7 +394,7 @@ Content-type structure:
 - Core facts
 - User impact
 - VERTU / luxury tech angle
-- FAQ
+- FAQ only when recurring reader questions or query evidence support it
 - Related links
 
 **Buying Guide** — should include:
@@ -384,7 +404,7 @@ Content-type structure:
 - Comparison
 - Buying advice
 - Risk reminder
-- FAQ
+- FAQ only when recurring reader questions or query evidence support it
 - Relevant product / guide links
 
 **Product Story** — should include:
@@ -411,6 +431,15 @@ Content-type structure:
 - Brand asset
 - Visual narrative
 - Restrained CTA
+
+### 5.5.1 Deterministic Editorial Safeguards
+
+For every final article, run `scripts/vertu_editorial_safeguards.py article` against the exact reviewed body. For a multi-article production run, also run `scripts/vertu_editorial_safeguards.py batch` against the complete current batch before issuing the authorising preflight result. Preserve the JSON output with the QA evidence and bind it to the same draft-bundle identity.
+
+- More than one explanatory VERTU/Concierge integration heading emits `DUPLICATE_VERTU_CONCIERGE_INTEGRATION` as an unresolved `required` Finding and forces `FIX`. Navigation headings such as Related VERTU reading are excluded.
+- A materially repeated meaningful H2–H4 fingerprint across the current batch emits `TEMPLATE_DEPENDENT_DRAFT` as an unresolved `required` Finding for the affected drafts and forces `FIX`. Sources, Final verdict and Related VERTU reading alone cannot trigger it.
+- A buyer/comparison draft at or above 1,500 substantive words without a descriptive in-body evidence visual or explicit editorial exception emits `BODY_VISUAL_MISSING` as a `recommended`, non-blocking warning in phase one. The hero image does not count.
+- Required safeguard Findings contribute to `unresolved_required` in `qa-handoff-v1`. A safeguard result from a different body or batch cannot authorise release.
 
 ### 5.6 Compliance / Risk
 
@@ -455,6 +484,16 @@ Context handling is mandatory:
 - Do **not** auto-block a term used only in a clear negation or disclaimer (for example, "does not diagnose"), a sourced quotation, or an educational discussion of what a product cannot do.
 - Negative/disclaimer contexts still require semantic compliance review. Rephrase when possible (for example, "not a clinical assessment") to reduce ambiguity.
 - This context exception never permits an unverified VERTU product, privacy, security, medical, or referral capability claim.
+
+Deterministic context routing is mandatory:
+
+- A literal term match is recall only and must not directly set the final compliance verdict.
+- Use `scripts/vertu_qa_policy.py restricted-context` or an equivalent implementation that emits `rule_id`, `classification`, `matched_excerpt`, `auto_block`, and `semantic_review_required`.
+- Clear travel, booking, payment, offer, fare, ticket, upgrade or transaction senses of `treat` / `treatment` are `NON_MEDICAL_CONTEXT` and must not auto-block. Example: `Treat the offer as a new transaction.`
+- An affirmative medical context such as `This device can treat hypertension.` is `AFFIRMATIVE_MEDICAL_CLAIM` and blocks.
+- When medical and non-medical terms coexist in the same local clause, affirmative medical context takes precedence and blocks. A negation in an earlier, adversarially separated clause does not negate a later affirmative claim.
+- Clear negation/disclaimer context is `NEGATION_OR_DISCLAIMER`: do not auto-block, but require semantic review.
+- Ambiguous context is `AMBIGUOUS_CONTEXT`: do not auto-block from the keyword alone; route to semantic review.
 
 **High-risk restricted terms (block on product pages, landing pages, and ad copy; allowed in blog / guide only with disclaimer)**:
 
@@ -588,6 +627,10 @@ Every run must output:
 - Risk Level: low / medium / high
 - QA Run ID:
 - Skill Version:
+- QA Policy ID:
+- QA Policy Version:
+- QA Policy Hash:
+- Evaluation Profile:
 - Review Round:
 - Parent QA Run ID:
 - Article URL:

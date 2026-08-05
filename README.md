@@ -8,8 +8,8 @@ contracts, and notification sender used by the VERTU publishing chain.
 
 Current packaged versions:
 
-- editorial pipeline: `vertu-english-blog-pipeline` v3.8.0
-- independent SEO QA gate: `vertu-seo-publish-gate` v0.4.0
+- editorial pipeline: `vertu-english-blog-pipeline` v3.11.0
+- independent SEO QA gate: `vertu-seo-publish-gate` v0.7.0
 - automation profile: `vertu-10`, daily at 09:00 Asia/Hong_Kong
 
 The repository is designed as a reference implementation. It contains no
@@ -20,6 +20,8 @@ authority. Operators must supply their own integrations and configuration.
 
 ```text
 GSC + Google Trends + editorial intelligence + live inventory
+  -> qualify demand by independent acquisition-system family
+  -> require a minimum candidate-level GSC sample
   -> score at least 30 candidates
   -> select only demand-qualified topics
   -> research and write original articles
@@ -32,6 +34,7 @@ GSC + Google Trends + editorial intelligence + live inventory
   -> vvv group receipt
   -> 24h / 72h / 7d / 28d monitoring
   -> governed performance-learning priors
+  -> paired review + replay + mature production scorecard
 ```
 
 The editorial Skill does not self-approve. QA, image generation, production
@@ -67,6 +70,14 @@ Architecture and governance:
 - Missing Feishu handoff is `HANDOFF_INCOMPLETE`, never silent success.
 - Missing or delayed analytics is `DATA_NOT_MATURE` or `SOURCE_BLOCKED`, never
   zero.
+- Candidate GSC can support positive demand only when its newest finalised
+  window has at least 3 clicks or 100 impressions; smaller samples remain
+  visible but do not satisfy provider independence.
+- Duplicate brand/concierge integration sections and materially repeated batch
+  outlines are QA blockers. Missing in-body evidence visuals are warning-only
+  until a controlled experiment validates a hard gate.
+- Checkpoint history remains immutable while lifecycle metadata identifies one
+  current observation per logical article/checkpoint key.
 - Secrets are resolved at runtime only. This repository contains no secret
   values or production output artifacts.
 

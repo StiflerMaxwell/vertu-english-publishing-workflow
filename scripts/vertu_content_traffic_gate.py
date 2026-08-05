@@ -64,6 +64,84 @@ LEARNING_SCOPE_FIELDS = {
     "portfolio_bucket",
 }
 MAX_LEARNING_ADJUSTMENT = 3.0
+TRAFFIC_GATE_CONTRACT_VERSION = "traffic-acquisition-v3.10.0"
+TRAFFIC_GATE_RUNTIME_VERSION = "3.10.0"
+SCORE_SOURCE = "computed_v3_10_0"
+GSC_MIN_CLICKS = 3
+GSC_MIN_IMPRESSIONS = 100
+SEARCH_DEMAND_PROVIDER_FAMILIES = {
+    "gsc",
+    "google_trends",
+    "google_ads_keyword_planner",
+}
+
+
+def _provider_family(
+    provider: str, signal: Optional[Dict[str, Any]] = None
+) -> Tuple[str, str]:
+    """Return the acquisition-system family and the signal's demand role."""
+
+    provider = str(provider or "").strip().casefold()
+    if provider == "gsc" or provider.startswith("gsc_"):
+        return "gsc", "acquisition"
+    if (
+        provider in REALTIME_TRENDS_PROVIDERS
+        or provider == "official_google_trends"
+        or provider.startswith("google_trends")
+    ):
+        return "google_trends", "acquisition"
+    if (
+        provider in {"keyword_planner", "google_ads_keyword_planner"}
+        or provider.startswith("keyword_planner_")
+        or provider.startswith("google_ads_keyword_planner_")
+    ):
+        return "google_ads_keyword_planner", "acquisition"
+
+    signal = signal or {}
+    evidence_ref = str(signal.get("evidence_ref") or "").casefold()
+    metrics = signal.get("metrics") or {}
+    if provider == "current_interest" and (
+        "keyword-planner" in evidence_ref
+        or "keyword_planner" in evidence_ref
+        or any(
+            key in metrics
+            for key in (
+                "average_monthly_searches",
+                "recent_month_searches",
+                "monthly_searches",
+            )
+        )
+    ):
+        return "google_ads_keyword_planner", "supporting_current"
+    if provider in {"current_event", "current_interest", "news_cycle"}:
+        return "supporting_current", "supporting_current"
+    if provider in {
+        "editorial_breakout",
+        "hacker_news",
+        "reddit",
+        "techmeme",
+        "multi_publisher_cluster",
+    }:
+        return "supporting_editorial", "supporting_editorial"
+    return "supporting_other", "supporting_other"
+
+
+def _gsc_sample_metrics(metrics: Dict[str, Any]) -> Tuple[float, float, str]:
+    """Read candidate GSC sample metrics in finalised-window priority order."""
+
+    metric_windows = (
+        ("recent_clicks", "recent_impressions", "recent_finalised"),
+        ("annual_clicks", "annual_impressions", "annual_finalised"),
+        ("clicks", "impressions", "generic"),
+    )
+    for clicks_key, impressions_key, window in metric_windows:
+        if clicks_key in metrics or impressions_key in metrics:
+            return (
+                _number(metrics.get(clicks_key)) or 0.0,
+                _number(metrics.get(impressions_key)) or 0.0,
+                window,
+            )
+    return 0.0, 0.0, "missing"
 
 
 def _bounded_score(value: Any) -> Optional[float]:
@@ -149,7 +227,9 @@ def verify_live_sources(
             request = urllib.request.Request(
                 url,
                 headers={
-                    "User-Agent": "VERTU-Content-Traffic-Gate/3.5.0",
+                    "User-Agent": (
+                        f"VERTU-Content-Traffic-Gate/{TRAFFIC_GATE_RUNTIME_VERSION}"
+                    ),
                     "Range": "bytes=0-524287",
                 },
             )
@@ -351,6 +431,16 @@ def _apply_learning_priority(
     candidate: Dict[str, Any], priors: Sequence[Dict[str, Any]]
 ) -> Dict[str, Any]:
     row = copy.deepcopy(candidate)
+    if not row.get("eligible"):
+        row["durable_learning_adjustment"] = 0.0
+        row["provisional_learning_adjustment"] = 0.0
+        row["learning_adjustment"] = 0.0
+        row["selection_priority_score"] = round(float(row.get("score") or 0), 2)
+        row["matched_learning_priors"] = []
+        row["matched_durable_priors"] = []
+        row["matched_provisional_priors"] = []
+        row["learning_can_change_eligibility"] = False
+        return row
     matched: List[str] = []
     matched_durable: List[str] = []
     matched_provisional: List[str] = []
@@ -600,13 +690,18 @@ def _validate_evidence_block(
 
 def _signal_statuses(
     signals: Any, errors: List[str]
-) -> Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
+) -> Tuple[
+    Dict[str, Dict[str, Any]],
+    List[Dict[str, Any]],
+    List[Dict[str, Any]],
+]:
     if not isinstance(signals, list):
         errors.append("missing_demand_signals")
-        return {}, []
+        return {}, [], []
 
     statuses: Dict[str, Dict[str, Any]] = {}
     positive: List[Dict[str, Any]] = []
+    qualifications: List[Dict[str, Any]] = []
     for index, raw_signal in enumerate(signals):
         if not isinstance(raw_signal, dict):
             errors.append(f"invalid_demand_signal:{index}")
@@ -623,35 +718,157 @@ def _signal_statuses(
         if not str(signal.get("observed_at") or "").strip():
             errors.append(f"missing_demand_observed_at:{provider}")
 
+        provider_family, demand_role = _provider_family(provider, signal)
+
         if status == SOURCE_UNAVAILABLE:
             unavailable = {
                 "status": SOURCE_UNAVAILABLE,
                 "reason": str(signal.get("reason") or "").strip(),
                 "observed_at": signal.get("observed_at"),
+                "provider_family": provider_family,
+                "demand_role": demand_role,
+                "qualification_status": SOURCE_UNAVAILABLE,
+                "qualification_reason": str(signal.get("reason") or "").strip(),
+                "counts_for_search_demand": False,
             }
             if not unavailable["reason"]:
                 errors.append(f"missing_unavailable_reason:{provider}")
             statuses[provider] = unavailable
+            qualifications.append(
+                {
+                    "signal_index": index,
+                    "provider": provider,
+                    **copy.deepcopy(unavailable),
+                }
+            )
             continue
 
         score = _bounded_score(signal.get("score_100"))
         evidence_ref = str(signal.get("evidence_ref") or "").strip()
+        metrics = copy.deepcopy(signal.get("metrics") or {})
         if score is None:
             errors.append(f"invalid_demand_score:{provider}")
         if not evidence_ref:
             errors.append(f"missing_demand_evidence:{provider}")
+        raw_positive = bool(signal.get("positive"))
+        qualification_status = "NOT_POSITIVE"
+        qualification_reason = "upstream_positive_false"
+        qualification_metrics: Dict[str, Any] = {}
+        effectively_positive = False
+        if raw_positive:
+            if score is None or not evidence_ref:
+                qualification_status = "INVALID_EVIDENCE"
+                qualification_reason = "positive_signal_requires_score_and_evidence"
+            elif provider_family == "gsc":
+                clicks, impressions, metric_window = _gsc_sample_metrics(metrics)
+                qualification_metrics = {
+                    "clicks": clicks,
+                    "impressions": impressions,
+                    "metric_window": metric_window,
+                }
+                if clicks < GSC_MIN_CLICKS and impressions < GSC_MIN_IMPRESSIONS:
+                    qualification_status = "INSUFFICIENT_SAMPLE"
+                    qualification_reason = (
+                        "gsc_requires_clicks_gte_3_or_impressions_gte_100"
+                    )
+                else:
+                    qualification_status = "QUALIFIED"
+                    qualification_reason = "gsc_sample_floor_passed"
+                    effectively_positive = True
+            elif demand_role == "acquisition":
+                qualification_status = "QUALIFIED"
+                qualification_reason = "positive_acquisition_evidence"
+                effectively_positive = True
+            else:
+                qualification_status = "QUALIFIED_SUPPORTING"
+                qualification_reason = (
+                    "supporting_signal_not_independent_search_demand"
+                )
+                effectively_positive = True
+
+        counts_for_search_demand = (
+            effectively_positive
+            and demand_role == "acquisition"
+            and provider_family in SEARCH_DEMAND_PROVIDER_FAMILIES
+        )
         available = {
             "status": AVAILABLE,
-            "positive": bool(signal.get("positive")),
+            "positive": raw_positive,
             "score_100": score,
             "evidence_ref": evidence_ref,
             "observed_at": signal.get("observed_at"),
-            "metrics": copy.deepcopy(signal.get("metrics") or {}),
+            "metrics": metrics,
+            "provider_family": provider_family,
+            "demand_role": demand_role,
+            "qualification_status": qualification_status,
+            "qualification_reason": qualification_reason,
+            "qualification_metrics": qualification_metrics,
+            "effectively_positive": effectively_positive,
+            "counts_for_search_demand": counts_for_search_demand,
         }
         statuses[provider] = available
-        if available["positive"] and score is not None and evidence_ref:
-            positive.append({"provider": provider, **available})
-    return statuses, positive
+        qualification = {
+            "signal_index": index,
+            "provider": provider,
+            **copy.deepcopy(available),
+        }
+        qualifications.append(qualification)
+        if effectively_positive:
+            positive.append(qualification)
+    return statuses, positive, qualifications
+
+
+def _market_demand_by_provider_family(
+    positive_signals: Sequence[Dict[str, Any]],
+    qualifications: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Select one strongest qualified score for each independent family."""
+
+    independent_families = {
+        str(signal.get("provider_family") or "")
+        for signal in positive_signals
+        if signal.get("counts_for_search_demand") is True
+    }
+    family_scores: Dict[str, Dict[str, Any]] = {}
+    for family in sorted(independent_families):
+        family_signals = [
+            signal
+            for signal in positive_signals
+            if signal.get("provider_family") == family
+        ]
+        if not family_signals:
+            continue
+        strongest = sorted(
+            family_signals,
+            key=lambda signal: (
+                -float(signal.get("score_100") or 0.0),
+                str(signal.get("provider") or ""),
+                int(signal.get("signal_index") or 0),
+            ),
+        )[0]
+        family_scores[family] = {
+            "score_100": float(strongest["score_100"]),
+            "selected_provider": strongest["provider"],
+            "selected_signal_index": strongest["signal_index"],
+            "qualified_providers": sorted(
+                {
+                    str(signal.get("provider") or "")
+                    for signal in family_signals
+                    if str(signal.get("provider") or "")
+                }
+            ),
+        }
+
+    selected = {
+        (family, row["selected_signal_index"])
+        for family, row in family_scores.items()
+    }
+    for qualification in qualifications:
+        qualification["selected_for_market_demand"] = (
+            qualification.get("provider_family"),
+            qualification.get("signal_index"),
+        ) in selected
+    return family_scores
 
 
 def _validate_cluster_support(candidate: Dict[str, Any], errors: List[str]) -> None:
@@ -741,7 +958,7 @@ def evaluate_candidate(
     live_primary_verifications: Optional[Dict[str, Dict[str, Any]]] = None,
     source_velocity: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """Validate one candidate and calculate its final v3.5.0 score."""
+    """Validate one candidate and calculate its active-contract raw score."""
 
     row = copy.deepcopy(candidate)
     errors: List[str] = []
@@ -751,10 +968,28 @@ def evaluate_candidate(
     if section == "news" or slug == "news" or slug.startswith("news/"):
         vetoes.append("automatic_news_route")
 
-    source_statuses, positive_signals = _signal_statuses(
+    source_statuses, positive_signals, signal_qualifications = _signal_statuses(
         row.get("demand_signals"), errors
     )
-    positive_providers = {signal["provider"] for signal in positive_signals}
+    positive_acquisition_signals = [
+        signal
+        for signal in positive_signals
+        if signal.get("counts_for_search_demand") is True
+    ]
+    positive_providers = {
+        signal["provider"] for signal in positive_acquisition_signals
+    }
+    positive_provider_families = {
+        signal["provider_family"] for signal in positive_acquisition_signals
+    }
+    qualified_supporting_providers = {
+        signal["provider"]
+        for signal in positive_signals
+        if signal.get("demand_role") != "acquisition"
+    }
+    provider_family_scores = _market_demand_by_provider_family(
+        positive_signals, signal_qualifications
+    )
     trend_class = str(row.get("trend_class") or "").strip().upper()
     if trend_class not in TREND_CLASSES:
         errors.append("invalid_or_missing_trend_class")
@@ -794,9 +1029,9 @@ def evaluate_candidate(
     _validate_cluster_support(row, errors)
 
     market_demand_100 = (
-        sum(float(signal["score_100"]) for signal in positive_signals)
-        / len(positive_signals)
-        if positive_signals
+        sum(float(row["score_100"]) for row in provider_family_scores.values())
+        / len(provider_family_scores)
+        if provider_family_scores
         else 0.0
     )
     score_breakdown: Dict[str, Dict[str, Any]] = {
@@ -807,6 +1042,8 @@ def evaluate_candidate(
                 market_demand_100 * SCORE_WEIGHTS["market_demand"] / 100, 2
             ),
             "providers": sorted(positive_providers),
+            "provider_families": sorted(positive_provider_families),
+            "provider_family_scores": copy.deepcopy(provider_family_scores),
         }
     }
     for key in DIMENSION_KEYS:
@@ -830,17 +1067,22 @@ def evaluate_candidate(
     sufficient_demand = False
     demand_verdict = "REJECT"
     if lane == "search-first":
-        sufficient_demand = len(positive_providers) >= 2
+        sufficient_demand = len(positive_provider_families) >= 2
     elif lane == "discover-first":
-        current_provider = editorial_breakout_verified or bool(verified_realtime) or bool(
-            positive_providers
-            & {"google_trends", "current_event", "current_interest", "news_cycle"}
+        current_provider = (
+            editorial_breakout_verified
+            or bool(verified_realtime)
+            or any(
+                signal.get("provider_family") == "google_trends"
+                or signal.get("demand_role") == "supporting_current"
+                for signal in positive_signals
+            )
         )
         historical = (dimension_scores.get("historical_fit") or 0) > 0
         visual = (dimension_scores.get("discover_story") or 0) > 0
         sufficient_demand = current_provider and historical and visual
     elif lane == "authority-first":
-        sufficient_demand = len(positive_providers) >= 1
+        sufficient_demand = len(positive_provider_families) >= 1
     else:
         errors.append("invalid_outcome_lane")
 
@@ -862,7 +1104,9 @@ def evaluate_candidate(
     row.update(
         {
             "score": final_score,
-            "score_source": "computed_v3_5_0",
+            "raw_score": final_score,
+            "score_source": SCORE_SOURCE,
+            "score_contract_version": TRAFFIC_GATE_CONTRACT_VERSION,
             "score_breakdown": score_breakdown,
             "trend_class": trend_class,
             "editorial_signal": str(row.get("editorial_signal") or "").strip().upper(),
@@ -886,6 +1130,13 @@ def evaluate_candidate(
             ),
             "demand_verdict": demand_verdict,
             "positive_demand_providers": sorted(positive_providers),
+            "positive_demand_provider_families": sorted(
+                positive_provider_families
+            ),
+            "qualified_supporting_providers": sorted(
+                qualified_supporting_providers
+            ),
+            "demand_signal_qualifications": signal_qualifications,
             "source_statuses": source_statuses,
             "validation_errors": sorted(set(errors)),
             "vetoes": vetoes,
@@ -1014,7 +1265,8 @@ def select_portfolio(
         try_add(row)
 
     return {
-        "rubric_version": "traffic-acquisition-v3.5.0",
+        "rubric_version": TRAFFIC_GATE_CONTRACT_VERSION,
+        "score_source": SCORE_SOURCE,
         "trend_mode": trend_mode,
         "candidate_count": len(candidates),
         "max_articles": max_articles,

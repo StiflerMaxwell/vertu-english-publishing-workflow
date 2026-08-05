@@ -31,7 +31,10 @@ Traffic and intelligence gates:
 - Consume the latest successful editorial-intelligence upstream.
 - Fetch official Google Trends Trending Now evidence for configured markets.
 - Validate durable and provisional learning priors before scoring.
-- Score at least 30 candidates with the deterministic traffic gate.
+- Score at least 30 candidates with `score_source=computed_v3_10_0`.
+- Count positive Search evidence by acquisition-system family. Candidate GSC
+  counts only when the newest finalised window has at least 3 clicks or 100
+  impressions; preserve smaller samples as AVAILABLE/INSUFFICIENT_SAMPLE.
 - Select only demand-qualified candidates with score >=80, no hard veto and a
   pre-draft Discover forecast PASS. NO_TOPIC is preferable to filler.
 
@@ -48,6 +51,9 @@ Article gates:
 - Include one article-specific value object and reader-visible evidence.
 - Require contextual internal links and authoritative external evidence.
 - Run the human editorial pass, independent SEO QA and Discover readiness.
+- Use producer 3.11.0 with independent QA 0.7.0 through `qa-handoff-v1`.
+- Reject duplicate brand/concierge integration sections and materially repeated
+  batch heading fingerprints. Treat BODY_VISUAL_MISSING as warning-only.
 - Generate an article-specific 16:9 hero only after both gates pass.
 - Use only configured institutional author IDs selected by expertise.
 

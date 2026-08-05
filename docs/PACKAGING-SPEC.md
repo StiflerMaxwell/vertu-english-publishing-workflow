@@ -8,9 +8,10 @@ tenant identifiers, private run artifacts or machine-specific session state.
 
 ## Included
 
-- canonical editorial Skill v3.8.0 and every active reference;
-- independent SEO QA Skill v0.4.0 and its tracking contract;
-- deterministic demand scoring, realtime Trends and learning-flywheel scripts;
+- canonical editorial Skill v3.11.0 and every active reference;
+- independent SEO QA Skill v0.7.0 and its tracking contract;
+- deterministic demand scoring, realtime Trends, monitoring handoff,
+  QA-identity, Skill scorecard and learning-flywheel scripts;
 - script unit tests;
 - sanitised `vertu-10` automation template;
 - chain, monitoring and vvv receipt contracts;
@@ -35,7 +36,7 @@ revision and schema safety contract.
 
 ## Acceptance checks
 
-- all three Python test suites pass;
+- all packaged Python test suites pass;
 - all packaged CLI entry points return usage successfully;
 - no machine-specific user-home path remains;
 - no known secret-value pattern is present;

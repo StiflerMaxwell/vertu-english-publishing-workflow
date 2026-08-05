@@ -37,6 +37,94 @@ def checkpoint(slug, checkpoint_name="28d", classification="WINNER", executed=Tr
 
 
 class LearningFlywheelTests(unittest.TestCase):
+    def test_current_production_artifacts_supply_complete_learning_context(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            run = root / "2026-08-03" / "daily-10"
+            slug = "production-shape-article"
+            write_json(
+                run / "performance" / slug / "72h-result.json",
+                checkpoint(
+                    slug,
+                    checkpoint_name="72h",
+                    classification="SEARCH_CTR_OPPORTUNITY",
+                ),
+            )
+            write_json(
+                run / "cluster-support.json",
+                {
+                    "publication_run_id": "run-production",
+                    "candidates": [
+                        {"candidate_id": "C01", "cluster": "premium_cabin_decisions"}
+                    ],
+                },
+            )
+            write_json(
+                run / "candidate-scores.json",
+                {
+                    "selected": [
+                        {
+                            "publication_run_id": "run-production",
+                            "candidate_id": "C01",
+                            "slug": slug,
+                            "section": "guides",
+                            "outcome_lane": "search-first",
+                            "portfolio_bucket": "proven_demand",
+                            "trend_class": "EVERGREEN_SEARCH",
+                            "intent_key": "premium-cabin-upgrade-decision",
+                        }
+                    ]
+                },
+            )
+            write_json(
+                run / "run-summary.json",
+                {
+                    "run_id": "run-production",
+                    "status": "SUCCESS",
+                    "articles": [
+                        {
+                            "candidate_id": "C01",
+                            "slug": slug,
+                            "section": "guides",
+                            "trend_class": "EVERGREEN_SEARCH",
+                            "live_verdict": "PASS",
+                        }
+                    ],
+                },
+            )
+
+            snapshot, _ = learning.build_snapshot(root, "production-shape-test")
+            row = snapshot["checkpoints"][0]
+
+            self.assertEqual(row["publication_run_id"], "run-production")
+            self.assertEqual(row["cluster_id"], "premium_cabin_decisions")
+            self.assertEqual(row["intent_key"], "premium-cabin-upgrade-decision")
+            self.assertEqual(row["learning_context_status"], "COMPLETE")
+            self.assertEqual(row["raw_classification"], "SEARCH_CTR_OPPORTUNITY")
+            self.assertEqual(row["learning_direction"], -1)
+            self.assertEqual(snapshot["learning_context_completeness"]["complete"], 1)
+
+    def test_partial_context_cannot_create_broad_section_prior(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            for index, run_id in enumerate(("run-a", "run-a", "run-b"), start=1):
+                slug = f"partial-{index}"
+                write_json(
+                    root / run_id / "performance" / slug / "28d-result.json",
+                    checkpoint(slug),
+                )
+                write_json(
+                    root / run_id / "run-summary.json",
+                    {
+                        "run_id": run_id,
+                        "articles": [{"slug": slug, "section": "guides"}],
+                    },
+                )
+
+            _, active = learning.build_snapshot(root, "partial-context-test")
+
+            self.assertEqual(active["priors"], [])
+
     def test_placeholder_and_immature_inputs_are_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp)

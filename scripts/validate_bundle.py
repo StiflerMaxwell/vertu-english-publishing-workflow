@@ -23,12 +23,21 @@ REQUIRED_FILES = {
     "config/performance-monitor-base.example.json",
     "contracts/VERTU-Content-Automation-Chain-Contract.md",
     "contracts/VERTU-Content-Performance-Monitoring-Contract.md",
+    "contracts/VERTU-QA-Handoff-Contract.md",
     "contracts/VERTU-vvv-Group-Receipt-Template.md",
     "docs/PUBLIC-RELEASE-CHECKLIST.md",
     "skills/vertu-english-blog-pipeline/SKILL.md",
     "skills/vertu-english-blog-pipeline/references/README.md",
     "skills/vertu-seo-publish-gate/SKILL.md",
+    "skills/vertu-seo-publish-gate/scripts/vertu_qa_policy.py",
+    "skills/vertu-seo-publish-gate/scripts/vertu_editorial_safeguards.py",
     "scripts/vertu_content_traffic_gate.py",
+    "scripts/vertu_content_monitor_runtime.py",
+    "scripts/vertu_content_monitor_base_handoff.py",
+    "scripts/vertu_qa_policy.py",
+    "scripts/vertu_qa_handoff.py",
+    "scripts/vertu_editorial_safeguards.py",
+    "scripts/vertu_skill_evolution_scorecard.py",
     "scripts/vertu_google_trends_realtime.py",
     "scripts/vertu_content_learning_flywheel.py",
     "scripts/vertu-vvv-notify.ts",
@@ -40,6 +49,7 @@ ACTIVE_REFERENCES = {
     "realtime-trends.md",
     "editorial-intelligence.md",
     "performance-learning.md",
+    "skill-evolution-scorecard.md",
     "product-knowledge.md",
     "writing-contract.md",
     "author-policy.md",
@@ -129,6 +139,23 @@ def main() -> int:
     for name in sorted(excluded_roots):
         if (ROOT / name).exists():
             failures.append(f"excluded runtime directory present: {name}")
+
+    mirrored_sources = (
+        (
+            ROOT / "scripts/vertu_qa_policy.py",
+            ROOT / "skills/vertu-seo-publish-gate/scripts/vertu_qa_policy.py",
+        ),
+        (
+            ROOT / "scripts/vertu_editorial_safeguards.py",
+            ROOT / "skills/vertu-seo-publish-gate/scripts/vertu_editorial_safeguards.py",
+        ),
+    )
+    for reusable, bundled in mirrored_sources:
+        if reusable.is_file() and bundled.is_file() and reusable.read_bytes() != bundled.read_bytes():
+            failures.append(
+                "mirrored QA source drift: "
+                f"{reusable.relative_to(ROOT)} != {bundled.relative_to(ROOT)}"
+            )
 
     if failures:
         for failure in failures:

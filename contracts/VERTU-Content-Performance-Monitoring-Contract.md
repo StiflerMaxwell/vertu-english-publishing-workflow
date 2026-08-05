@@ -86,7 +86,7 @@ Feed validated learnings into the next `discover-baseline.json`, but never clone
 
 ## Learning and skill-evolution handoff
 
-The daily monitor produces daily pulses and checkpoint evidence; it does not directly rewrite the publishing skill. A separate learning and Skill release run executes at least once every 48 hours and applies the canonical durable `performance-learning-v1` plus provisional `performance-learning-provisional-v1` contracts:
+The daily monitor produces daily pulses and checkpoint evidence; it does not directly rewrite the publishing skill. A separate learning and Skill release run executes twice daily and applies the canonical durable `performance-learning-v1` plus provisional `performance-learning-provisional-v1` contracts. The faster cadence surfaces observations sooner but does not reduce evidence maturity:
 
 - one mature T+72h result remains an `OBSERVATION`;
 - repeated recent T+72h or D+7 patterns may become expiring `CANDIDATE_PRIOR` ordering evidence;
@@ -97,7 +97,12 @@ The daily monitor produces daily pulses and checkpoint evidence; it does not dir
 
 Write immutable 48-hour snapshots under `output/vertu-signals/learning/YYYY-MM-DD/<execution-id>/`. Maintain durable state at `output/vertu-signals/learning/active-performance-priors.json` and provisional state at `output/vertu-signals/learning/provisional-performance-priors.json`. Record every proposal, activation, expiry, rejection and rollback in canonical Base `Skill Change Log`.
 
-Every 48 hours, validate the preceding 35-day daily-pulse window and the 90-day mature-evidence comparison window, replay proposed changes against historical candidates, run tests, expire stale or reversed priors and execute the Skill release gate. Version only material, tested changes; otherwise record `NO_PROMOTION` and `NO_SKILL_CHANGE` and preserve the current version. Structural changes to weights, thresholds, vetoes, source authority, publication authority or QA boundaries require explicit approval.
+Twice daily, validate the preceding 35-day daily-pulse window and the 90-day mature-evidence comparison window, replay proposed changes against historical candidates, run tests, expire stale or reversed priors and execute the Skill release gate. This increases observation speed only; it does not reduce the mature evidence required for promotion. Version only material, tested changes; otherwise record `NO_PROMOTION` and `NO_SKILL_CHANGE` and preserve the current version. Structural changes to weights, thresholds, vetoes, source authority, publication authority or QA boundaries require explicit approval.
+
+Maintain a read-only current-state projection over immutable checkpoint rows.
+The logical key is `Article Key + checkpoint` plus exact Source Rev when that
+field is available. Update only lifecycle metadata and the replacement pointer;
+never rewrite clicks, impressions, CTR, GA4 metrics, diagnoses or source state.
 
 ## Diagnosis rules
 

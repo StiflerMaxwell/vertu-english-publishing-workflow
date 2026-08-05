@@ -8,10 +8,13 @@
    when authorised, editorial intelligence and live Sanity inventory.
 3. **Deterministic selection** — score at least 30 candidates. Demand, score,
    veto and pre-draft Discover checks all remain independent.
+   Acquisition-system families count once, and candidate GSC must pass the
+   configured sample floor before it can count as a positive provider.
 4. **Editorial production** — research primary sources, build claim and link
    ledgers, retrieve product knowledge when relevant, then draft.
 5. **Independent QA** — the QA Skill returns PASS, FIX or BLOCK. It cannot
-   directly publish.
+   directly publish. It also evaluates duplicate brand integration, batch
+   heading fingerprints and non-blocking body-visual coverage.
 6. **Discover and image gates** — require `DISCOVER_READY`, then generate and
    verify an article-specific hero through Codex Image Gen.
 7. **Run-scoped publication** — introspect the live Sanity schema and revision,
@@ -25,6 +28,9 @@
 11. **Governed learning** — build provisional and durable priors from mature
     evidence. Learning can reorder already eligible candidates by at most three
     points; it cannot manufacture demand or waive a gate.
+12. **Skill release scorecard** — keep structural diagnostics separate from
+    paired before/after review, historical replay and mature production
+    outcomes. A good code score is not proof of traffic lift.
 
 ## Separation of responsibilities
 

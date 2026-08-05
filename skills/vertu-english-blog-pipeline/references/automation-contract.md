@@ -1,4 +1,4 @@
-# Automation Contract — Traffic Acquisition v3.8.0
+# Automation Contract — Traffic Acquisition v3.11.0
 
 This contract makes the pipeline safe for Codex recurring automation and manual runs.
 
@@ -21,33 +21,31 @@ notification_target: codex
 
 A scheduled run may discover, research, select, and write without routine questions. It may not publish to production without a separate article-specific approval event.
 
-### Optional standing publication profile
+### Named standing publication profile: `vertu-10`
 
-A deployment may configure a named standing approval profile through
-`VERTU_STANDING_APPROVAL_PROFILE`. The public template does not grant one and
-remains draft-only by default. Any configured profile is a narrow exception to
-the scheduled default above, not a general publication permission.
+The user granted the recurring automation `vertu-10` standing authority on 14 July 2026 to publish each current daily run automatically after all gates pass. This profile is a narrow exception to the scheduled default above, not a general publication permission.
 
 Required behaviour:
 
-- scope authority to the new run created by the configured publishing automation; never reuse it for repairs, historical drafts, another automation or another section;
+- scope authority to the new run created by `vertu-10`; never reuse it for repairs, historical drafts, another automation or another section;
 - publish only articles individually scoring at least 80 with QA `PASS`, `DISCOVER_READY`, image `PASS`, author preflight `PASS`, live link verification and no veto;
-- require `editorial-intelligence.json`, `source-velocity.json` and `traffic-demand.json` with a computed v3.5 score, passing demand verdict, provider-level evidence and no validation error; a hand-authored final score is not publication evidence;
+- require `editorial-intelligence.json`, `source-velocity.json` and `traffic-demand.json` with `score_source=computed_v3_10_0`, passing demand verdict, provider-family qualification, raw source metrics and no validation error; a hand-authored final score is not publication evidence;
 - require `geo-audience-baseline.json`, `realtime-trends.json`, `trend-market-map.json` and `hotness-gate.json` before scoring;
 - require the current validated durable `performance-learning-v1` fingerprint and provisional `performance-learning-provisional-v1` fingerprint before scoring, or explicitly record `NO_DURABLE_LESSON`, `NO_PROVISIONAL_LESSON`, `LEARNING_PRIORS_UNAVAILABLE` or `PROVISIONAL_LEARNING_PRIORS_UNAVAILABLE`;
 - classify every serious candidate as `PREMIUM_DECISION_CORE | ADJACENT | EXPLORATION_CANDIDATE`; only a controlled test that passes the normal demand gate becomes `EXPLORATION`. Record mass recognisability, concrete decision intent, historical cluster evidence and niche risk;
 - treat the user-approved premium/business strategy as candidate-pool and portfolio guidance, never as a demand provider, raw-score change, trend label or veto waiver;
 - pass active durable and unexpired provisional priors to the scorer only as post-eligibility portfolio ordering with one combined `-3..+3` cap; never let them change raw score, demand evidence, vetoes or trend labels;
 - fetch official Trending Now RSS/CSV/UI evidence when API Alpha is unavailable; never skip all Google Trends collection merely because the API is not configured;
-- prohibit the `REALTIME_HOT` label unless the v3.5.0 scorer receives all three same-run fingerprinted trend artifacts, reconciles the exact query, every non-blank market and all reported metrics to that snapshot, and confirms official market-level evidence plus a current verified primary source;
+- prohibit the `REALTIME_HOT` label unless the active scorer receives all three same-run fingerprinted trend artifacts, reconciles the exact query, every non-blank market and all reported metrics to that snapshot, and confirms official market-level evidence plus a current verified primary source;
 - require the latest same-day Hermes RSS and editorial-synthesis outputs before broad candidate creation; an `EDITORIAL_BREAKOUT` must reconcile to `source-velocity.json` and remains distinct from official Google demand evidence;
 - allow fewer than ten articles and `NO_TOPIC`; never publish filler to satisfy volume;
+- require independent QA to run the active editorial-safeguards validator over every final article and the complete current batch; duplicate VERTU/Concierge integration or a template-dependent meaningful heading fingerprint is blocking, while `BODY_VISUAL_MISSING` remains warning-only in phase one;
 - keep the permanent automatic `news` and `/news/` veto;
 - query current Sanity schema, slug conflicts, authors and `_rev` values immediately before the mutation;
 - use one idempotent run ID, record the approval profile, mutation preview and transaction ID, and never retry a production mutation blindly;
 - after mutation, require HTTP 200, canonical, `og:image`, `max-image-preview:large`, exactly one template-rendered visible linked byline, no in-body `By ...` duplicate, matching `BlogPosting.author`, rendered-link reconciliation and non-News routing;
 - if any publication or live verification check fails, stop, preserve evidence and send a blocker notification instead of a success receipt;
-- after a fully verified publish, send the vvv group receipt defined in `contracts/VERTU-vvv-Group-Receipt-Template.md` through `scripts/vertu-vvv-notify.ts`, preserve its redacted receipt, and schedule 24h/72h/7d/28d monitoring;
+- after a fully verified publish, send the vvv group receipt defined in `docs/03-运行/VERTU-vvv-Group-Receipt-Template.md` through `scripts/vertu-vvv-notify.ts`, preserve its redacted receipt, and schedule 24h/72h/7d/28d monitoring;
 - never use the former WeChat gateway, `WECHAT_*` configuration, nickname routing, group-name routing, or the deprecated WeChat receipt template for VERTU content automations;
 - resolve the vvv App Secret only from `VERTU_VVV_APP_SECRET` or macOS Keychain service `vertu-vvv-user-robot`; never store it in prompts, source files, Feishu, run artifacts or logs;
 - count group delivery as successful only when the normalized receipt says `SENT`. Preserve `DELIVERY_UNKNOWN` and never retry an ambiguous POST blindly.
@@ -69,6 +67,8 @@ DISCOVERING
 
 Write every transition to `handoff.json` with a timestamp.
 
+Read `${VERTU_PDCA_ROOT}/contracts/VERTU-QA-Handoff-Contract.md` before any QA or publication transition. New production runs use `qa-handoff-v1`; independent component version numbers do not need to match, but their compatibility matrix and exact identities must.
+
 ## Handoff shape
 
 ```json
@@ -83,6 +83,17 @@ Write every transition to `handoff.json` with a timestamp.
   "evidence_status": "",
   "product_context_status": "",
   "qa_verdict": null,
+  "qa_handoff_contract_version": "qa-handoff-v1",
+  "producer_skill": {
+    "id": "vertu-english-blog-pipeline",
+    "version": "3.11.0"
+  },
+  "draft_bundle_sha256": null,
+  "qa_handoffs": {
+    "preflight": null,
+    "prepublish": null,
+    "postpublish_audit": null
+  },
   "discover_verdict": null,
   "image_status": "not_started",
   "delivery": "local_draft",
@@ -107,6 +118,15 @@ Write every transition to `handoff.json` with a timestamp.
 These are not publication approval: QA `PASS`, enabled automation, existing Sanity draft, general workflow approval, or approval of another article.
 
 Production approval must identify the current slug, document ID, or run ID. Store the reference in `handoff.json`.
+
+For a new automatic production run, approval never substitutes for compatible QA evidence. Require:
+
+- R0 `preflight` PASS bound to the exact draft bundle;
+- R1 `prepublish` PASS bound to the exact Sanity Draft revision;
+- no critical veto or unresolved critical/required Finding;
+- R2 `postpublish_audit` bound to the exact published revision before the full chain reports success.
+
+Each handoff records its immutable QA Run ID, Base QA record ID, policy ID/version/hash/profile, result fingerprint and compatibility status. Never select a QA result merely because it is the latest PASS.
 
 ## Sanity delivery
 
@@ -159,13 +179,13 @@ Before candidate creation, query finalised GSC by country and fetch official Goo
 For every serious candidate, preserve provider-level GSC, Trends/current-interest, Keyword Planner when authorised, SERP, inventory and cluster-support evidence with source status and fetch time. Label it REALTIME_HOT, RISING_SEARCH or EVERGREEN_SEARCH and never call the latter two real-time hot.
 Use a 72-hour current-source window plus durable evergreen demand, score at least 30 candidates, and select up to 10 topics scoring at least 80/100.
 Consume the same-day Hermes RSS and editorial synthesis before broad candidate creation, and preserve editorial-intelligence.json plus source-velocity.json.
-Calculate scores with the deterministic traffic gate; pass the editorial artifacts for breakout candidates plus durable and unexpired provisional learning priors when valid, reject hand-authored final scores and require the outcome lane's minimum independent demand signals.
+Calculate scores with the deterministic traffic gate; pass the editorial artifacts for breakout candidates plus durable and unexpired provisional learning priors when valid, reject hand-authored final scores, qualify candidate GSC against the latest available finalised-window sample floor, deduplicate demand by acquisition-system family, and require the outcome lane's minimum independent demand signals.
 Use traffic-weighted soft portfolio targets, preserve diversity, and reject abstract B2B, duplicate-intent, thin-update, and generic-visual topics.
 Classify every serious candidate as PREMIUM_DECISION_CORE, ADJACENT or EXPLORATION_CANDIDATE; promote the last lane to EXPLORATION only after normal eligibility. Prefer mass-recognisable premium travel, executive technology/privacy, watches/collecting and familiar luxury-purchase decisions only when they also pass the normal demand gate. Reject premium-label-only, niche-affluence-without-demand and no-defensible-content-gap topics.
 Fetch the current Feishu VERTU product knowledge base when a product or service is relevant.
 Produce substantial content at the depth required by its type, with at least one article-specific value object and reader-visible evidence.
 Count unique link destinations rather than anchor tags, preserve authoritative PDF evidence, reconcile the final body against the evidence pack and link plan, and verify approved links in the rendered canonical HTML after any authorised delivery.
-Run independent editorial QA and the separate Discover readiness gate.
+Run independent editorial QA, including duplicate VERTU/Concierge integration and batch heading-fingerprint safeguards, then the separate Discover readiness gate. Record long buyer/comparison drafts without a descriptive in-body evidence visual as a non-blocking first-phase warning.
 After both pass, create a concrete, non-generic, Discover-compliant 16:9 image brief and image.
 Verify visible authorship, BlogPosting.author, og:image, max-image-preview:large, and canonical URL before delivery.
 Produce the complete local draft artifact package under output/vertu-signals and a 24h/72h/7d/28d performance plan.
@@ -187,8 +207,8 @@ For published content, use one daily monitor that scans the rolling 35-day `PUBL
 - `7d`: one evidence-backed optimisation proposal at most;
 - `28d`: mature classification, cannibalisation, experiment verification, and portfolio learning.
 
-Use `${VERTU_PDCA_ROOT}/docs/03-运行/VERTU-Content-Performance-Monitoring-Contract.md` when available. Missing or delayed data is `DATA_NOT_MATURE`, never zero. The monitor may create a mutation preview but may not mutate Sanity without article-specific approval and a fresh `_rev`. Feed mature results into future baselines without overwriting historical runs.
+Use `${VERTU_PDCA_ROOT}/contracts/VERTU-Content-Performance-Monitoring-Contract.md` when available. Missing or delayed data is `DATA_NOT_MATURE`, never zero. The monitor may create a mutation preview but may not mutate Sanity without article-specific approval and a fresh `_rev`. Feed mature results into future baselines without overwriting historical runs.
 
 A mature 72-hour page that passes the Search or Discover sample gate must receive a concrete CTR, coverage, packaging, intent, promising, or winner-watch diagnosis. It must not remain generic `INSUFFICIENT_DATA`. Generate at most one major-variable proposal at 7 days and promote only verified 28-day experiment outcomes to durable topic priors.
 
-Run a separate learning and Skill release automation at least once every 48 hours after the daily monitor. It reads daily pulses plus the full executed checkpoint history, writes immutable `learning-snapshot.json`, rejects placeholders/immature/blocked inputs, records proposals and expiries in `Skill Change Log`, writes `provisional-performance-priors.json` from recent repeated 72h/7d evidence, and updates `active-performance-priors.json` only for replay-validated durable priors. Apply only material, tested non-structural changes automatically, keep structural changes approval-gated, and record `NO_PROMOTION` and `NO_SKILL_CHANGE` without a version bump when nothing qualifies.
+Run a separate learning and Skill release automation twice daily after the corresponding monitor pulse. It reads daily pulses plus the full executed checkpoint history, writes immutable `learning-snapshot.json`, rejects placeholders/immature/blocked inputs, records proposals and expiries in `Skill Change Log`, writes `provisional-performance-priors.json` from recent repeated 72h/7d evidence, and updates `active-performance-priors.json` only for replay-validated durable priors. Same-day spikes are observations or manual experiment candidates, never durable priors. Every material Skill or governing-process proposal must also produce a fingerprinted `skill-scorecard.json`: absolute structural scores are diagnostic only, paired before/after review controls keep/revert, replay is a hard gate and traffic-affecting promotion requires mature production evidence. Apply only material, tested non-structural changes automatically, keep structural changes and low-risk experiments approval-gated, and record `NO_PROMOTION` and `NO_SKILL_CHANGE` without a version bump when nothing qualifies.

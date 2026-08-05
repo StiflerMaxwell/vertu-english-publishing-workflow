@@ -54,6 +54,14 @@
   },
   "article_key": "Article Key",
   "checkpoint_write_mode": "idempotent_immutable_create_by_review_id",
+  "checkpoint_projection": {
+    "business_key": "Article Key + Checkpoint + Source Rev when present",
+    "lifecycle_field": "Evidence Validity",
+    "replaced_by_field": "Replaced By Review ID",
+    "states": ["CURRENT", "SUPERSEDED", "HISTORICAL"],
+    "metric_fields_mutable": false,
+    "readback_required": true
+  },
   "checkpoint_dedup": {
     "business_key": "Review ID",
     "prewrite_lookup": "exact_full_table_lookup_required",

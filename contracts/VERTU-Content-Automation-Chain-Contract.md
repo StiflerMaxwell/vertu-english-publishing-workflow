@@ -12,7 +12,7 @@ vertu-10 daily publish
 → vertu-2 repair, R2 QA, publish and live verification
 → vertu performance monitoring
 → daily performance pulse
-→ governed learning and Skill release check every 48 hours
+→ governed learning and Skill release observation twice daily
 → validated learning consumed by the next vertu-10 topic-selection run
 ```
 
@@ -55,7 +55,7 @@ If the initial run-ledger write fails, retry at most three times with bounded ba
 | `vertu-10` | Daily 09:00 Asia/Hong_Kong | New live-verified non-News posts, QA evidence, article assets, monitoring plan, vvv group receipt | Mature monitoring/experiment learnings, GSC baseline, live inventory, product KB |
 | `vertu-2` | Daily 14:30 Asia/Hong_Kong | Independent live-revision QA, Findings, queue classification, safe repair Drafts, R2 QA, verified republish evidence | New or changed published revisions plus QA Runs where `自动修复发布状态=待执行` |
 | `vertu` | Daily 19:00 Asia/Hong_Kong | Rolling 35-day daily pulse, 24h/72h/7d/28d checkpoints, diagnoses, controlled proposals, experiment verification, portfolio learning | Published and repaired revisions registered in `文章资产` and local `PUBLISHED` handoffs |
-| `vertu-skill` | Every 2 days at 21:30 Asia/Hong_Kong | Immutable learning snapshot, expiring provisional priors, durable promotion and Skill release gate, Skill Change Log proposals, replay evidence, rollback state, `NO_PROMOTION` or `NO_SKILL_CHANGE` | Daily pulses, executed mature checkpoints, verified experiments and prior Skill versions |
+| `vertu-skill` | Twice daily at 10:30 and 21:30 Asia/Hong_Kong | Immutable learning snapshot, expiring provisional priors, durable promotion and Skill release gate, Skill Change Log proposals, replay evidence, rollback state, `NO_PROMOTION` or `NO_SKILL_CHANGE` | Daily pulses, executed mature checkpoints, verified experiments and prior Skill versions |
 
 ## Shared identity and idempotency
 
@@ -139,12 +139,17 @@ Every monitoring execution emits a visible receipt containing scanned runs/artic
 1. Scan checkpoint artifacts and keep only executed, completed and mature 72h/7d/28d evidence.
 2. Deduplicate retries by article and checkpoint; reject planned placeholders, immature windows and source-blocked metrics explicitly.
 3. Classify evidence as `OBSERVATION`, expiring `CANDIDATE_PRIOR` or `DURABLE_PRIOR`.
-4. Every 48 hours, create or refresh a provisional prior only from recent repeated mature 72h/7d evidence; expire it after eight days unless a new governed run still supports it.
+4. Twice daily, create or refresh a provisional prior only from recent repeated mature 72h/7d evidence; expire it after eight days unless a new governed run still supports it.
 5. Require at least three mature D+28 articles across two publication runs, or one verified controlled experiment, before activating a durable prior.
 6. Replay proposed priors against historical candidate portfolios. Reject changes that reduce traffic-gate compliance, diversity or holdout quality.
 7. Apply provisional and durable priors only after eligibility with one combined `-3..+3` ordering adjustment.
 8. Write immutable local evidence, one `自动化运行日志` row and one `Skill Change Log` row per proposal, activation, expiry, rejection or rollback.
-9. Every 48 hours, run tests, Skill validation and historical replay, then execute the versioned Skill release gate. Apply material replay-safe non-structural changes, record `NO_PROMOTION` and `NO_SKILL_CHANGE` when nothing qualifies, and keep structural rubric, authority or safety changes explicitly approval-gated.
+9. Twice daily, run tests, Skill validation and historical replay, then execute the versioned Skill release gate. The shorter observation cadence does not shorten promotion maturity: traffic-affecting changes still require mature D+28 evidence or a verified controlled experiment. Apply material replay-safe non-structural changes, record `NO_PROMOTION` and `NO_SKILL_CHANGE` when nothing qualifies, and keep structural rubric, authority or safety changes explicitly approval-gated.
+
+Checkpoint history is immutable. A monitoring handoff may update only the
+configured lifecycle and replacement-pointer fields to maintain exactly one
+`CURRENT` observation per logical article/checkpoint identity; all older valid
+rows become `SUPERSEDED`, and blocked or immature rows remain `HISTORICAL`.
 10. The next `vertu-10` run records both learning fingerprints and matched prior IDs. Invalid, absent or expired evidence becomes an explicit unavailable/ignored state, never an inferred rule.
 
 ## Failure and recovery
@@ -166,4 +171,4 @@ Every monitoring execution emits a visible receipt containing scanned runs/artic
 6. The next daily topic-selection run reads mature cluster and experiment outcomes.
 7. No automatic article is assigned to `news` or `/news/`.
 8. Every automation invocation resolves to exactly one `自动化运行日志` row and one local run summary, including no-op and failure outcomes.
-9. Every active learned prior is fingerprinted, replay-validated, bounded, reversible and recorded in `Skill Change Log`; the promotion check runs no more than 48 hours apart.
+9. Every active learned prior is fingerprinted, replay-validated, bounded, reversible and recorded in `Skill Change Log`; observation checks run twice daily while promotion maturity remains unchanged.

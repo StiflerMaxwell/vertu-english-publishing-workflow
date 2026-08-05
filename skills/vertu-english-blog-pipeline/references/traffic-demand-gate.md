@@ -1,4 +1,4 @@
-# Traffic Demand Gate — v3.8.0
+# Traffic Demand Gate — v3.11.0
 
 Use this contract before selecting or drafting an article. Its purpose is to prove that a candidate has a plausible Search or Discover acquisition path. It does not promise ranking or recommendation.
 
@@ -29,6 +29,8 @@ A verified `EDITORIAL_BREAKOUT` can support Discover current interest when the p
 
 The user-approved premium/business strategy is candidate-pool and portfolio guidance only. It cannot satisfy any provider minimum. A `PREMIUM_DECISION_CORE` candidate still needs the same Search-first, Discover-first or Authority-first evidence as any other candidate.
 
+Provider independence is evaluated by acquisition-system family. Provider aliases, a `current_interest` signal derived from the same Keyword Planner artifact, or multiple views of one GSC export remain one family. The scorer may retain same-family supporting context, but it may not create an additional Search-demand provider.
+
 ## Score contract
 
 | Dimension | Weight |
@@ -53,6 +55,8 @@ python3 ${VERTU_PDCA_ROOT}/scripts/vertu_content_traffic_gate.py score \
 
 Selection requires computed score at least 80, `STRONG` or approved `TEST` demand verdict, no validation error, and no veto. A per-run script must never supply the final score.
 
+The active scorer emits `score_source=computed_v3_10_0`, `positive_demand_provider_families`, `demand_signal_qualifications` and one selected market-demand score per qualified family. Preserve these fields in `traffic-demand.json`; provider labels alone are not evidence of independence.
+
 For historical VERTU/GSC fit, reward the exact or adjacent reader cluster and decision pattern, not the presence of premium vocabulary. Evidence that commercial-airline cabin decisions performed well does not automatically support private aviation, generic hotels, yachts or all luxury travel. Preserve the narrowest supported boundary.
 
 Historical cluster adjacency and candidate-level GSC demand are different fields. Cluster adjacency can score historical fit. It counts as a positive demand provider only when finalised GSC query/page evidence maps to the candidate's same normalised query and intent. Score a piece of evidence once and never add points for the audience-fit lane itself.
@@ -64,6 +68,8 @@ When a validated durable `performance-learning-v1` artifact exists, pass it with
 ### GSC
 
 Use finalised data. Read query and page together, then add country and device when they materially change the opportunity. Record the recent 28-day change and the comparable prior window. Search Analytics may return top rows rather than an exhaustive export; record this limitation.
+
+Qualify candidate-level GSC demand against the newest available finalised window in this order: recent, annual, generic. The selected window counts only when clicks are at least 3 or impressions are at least 100. If the recent window exists but is smaller, preserve it as `AVAILABLE` with `qualification_status=INSUFFICIENT_SAMPLE`; do not fall back to a larger annual window to manufacture demand. The annual or generic window is used only when the more recent fields are absent.
 
 ### Google Trends
 
@@ -115,6 +121,6 @@ python3 ${VERTU_PDCA_ROOT}/scripts/vertu_content_traffic_gate.py classify-72h \
   --output performance/<slug>/diagnosis.json
 ```
 
-A mature sample-gate-passing checkpoint must receive a concrete diagnosis. Use repeated recent 72-hour and 7-day signals as expiring provisional ordering evidence only after the governed 48-hour promotion check. Promote only qualifying 28-day cohorts or verified experiments to durable scoring priors.
+A mature sample-gate-passing checkpoint must receive a concrete diagnosis. Use repeated recent 72-hour and 7-day signals as expiring provisional ordering evidence only after the governed twice-daily review check. Promote only qualifying 28-day cohorts or verified experiments to durable scoring priors.
 
 Apply `performance-learning.md`: a durable cohort prior requires at least three mature D+28 articles across two publication runs, unless a controlled experiment has a verified outcome. One spike never becomes a durable prior.

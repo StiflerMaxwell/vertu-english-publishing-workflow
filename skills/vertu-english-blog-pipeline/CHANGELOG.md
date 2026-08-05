@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.11.0 — 2026-08-05
+
+- Counted demand evidence by acquisition-system family so aliases and derived views of one upstream source cannot satisfy an independence requirement twice.
+- Required the newest available finalised candidate GSC window to reach at least three clicks or one hundred impressions before it can count as positive demand evidence; smaller samples remain visible as `AVAILABLE/INSUFFICIENT_SAMPLE`.
+- Added an independent QA blocker for duplicate VERTU/Concierge integration sections and batch-level meaningful-heading fingerprints.
+- Added `BODY_VISUAL_MISSING` as a measured, non-blocking warning for long buyer/comparison drafts pending a controlled experiment.
+- Added audited `CURRENT`/`SUPERSEDED`/`HISTORICAL` checkpoint projection without rewriting immutable performance metrics.
+- Aligned producer 3.11.0 with independent QA 0.7.0 through `qa-handoff-v1`, deterministic replay and canonical Base readback.
+
+## 3.10.0 — 2026-08-04
+
+- Made `computed_v3_10_0` the deterministic score source and preserved raw score separately from learned ordering adjustments.
+- Required candidate-level GSC query/page evidence to match the normalised intent before historical cluster adjacency may support Search demand.
+- Kept durable and provisional priors post-eligibility only with one combined `-3..+3` cap.
+- Strengthened evidence-pack, final-body and rendered-link reconciliation across the producer/QA handoff.
+
+## 3.9.0 — 2026-08-03
+
+- Added a deterministic three-layer Skill evolution scorecard: structural diagnostics, same-rubric paired comparison and mature production outcomes.
+- Made absolute scores triage-only; keep/revert requires paired majority and a fingerprinted historical replay with zero hard-gate regressions.
+- Required mature D+28 evidence across at least two runs or a verified controlled experiment before traffic-affecting Skill changes become promotion-eligible.
+- Kept structural activation and low-risk experiments manually approved.
+- Added machine-readable release states, fingerprints, tests, twice-daily automation instructions and canonical `Skill Change Log` tracking.
+- Shortened the review cadence to twice daily so afternoon publications can surface same-evening observations while preserving mature promotion thresholds.
+- Activated the governance infrastructure under explicit user approval without promoting a traffic rule or mutating Sanity.
+
 ## 3.8.0 — 2026-07-29
 
 - Shortened the governed learning and Skill release check from weekly to every 48 hours.

@@ -5,7 +5,7 @@ description: Research, demand-score, select, and write original English VERTU Si
 
 # VERTU English Blog Pipeline
 
-Current contract version: `3.8.0`.
+Current contract version: `3.11.0`.
 
 This is the canonical Discover-first workflow for selecting and writing original English VERTU Signals articles. Its business outcome is qualified organic traffic from Google Discover and Search, with relevant VERTU discovery and product journeys as downstream value.
 
@@ -44,6 +44,8 @@ Downstream capabilities remain separate:
 - **QA:** configured article QA skill. The current default is `~/.openclaw/workspace/skills/vertu-seo-publish-gate/SKILL.md`. Do not copy its rubric into this skill.
 - **Image:** Codex `image_gen`. Do not call MiniMax, legacy image HTTP endpoints, or a silent fallback provider.
 - **Publishing:** Sanity draft/publish operation after fresh schema introspection and explicit authority.
+
+The shared identity boundary is `${VERTU_PDCA_ROOT}/contracts/VERTU-QA-Handoff-Contract.md` (`qa-handoff-v1`). Production and QA keep independent versions and responsibilities, but every new production transition must validate the same producer version, draft-bundle fingerprint, QA policy hash/profile, immutable QA Run ID and exact Sanity revision where present.
 
 ## Outcome hierarchy
 
@@ -84,7 +86,7 @@ Hard rules:
 10. Editorial QA `PASS` is necessary but not sufficient. The article must also be `DISCOVER_READY`.
 11. Reserve `/news/` for first-party VERTU announcements, company statements, verified VERTU product launches, events, and media-safe corporate updates. Third-party technology events and competitor announcements must be framed as independent editorial analysis and routed to `/ai-tools/`, `/guides/`, or `/lifestyle/`.
 12. Authorship is expertise-first and transparent. Never invent individual people or credentials; use the approved institutional editorial desks in `references/author-policy.md`.
-13. Never accept a hand-authored final topic score. Calculate it from the active v3.8.0 demand-evidence contract and preserve the full score breakdown.
+13. Never accept a hand-authored final topic score. Calculate it with the active deterministic traffic gate and preserve the full score breakdown, provider-family qualification and raw source metrics.
 14. Search-first selection requires two independent positive demand signals. Discover-first selection requires current-interest evidence, historical VERTU cluster evidence, and a concrete visual story.
 15. Never describe a topic as hot or real-time from GSC, Keyword Planner, social engagement, or editorial feeds alone. Apply `references/realtime-trends.md` and require verified official Google Trends evidence for `REALTIME_HOT`.
 16. Before broad candidate generation, consume the same-day Hermes intelligence chain defined in `references/editorial-intelligence.md`. Treat it as mandatory discovery and breakout evidence, not as Google search-volume evidence.
@@ -93,9 +95,13 @@ Hard rules:
 19. A learned prior may never change raw eligibility, waive a veto, create a demand provider, create `REALTIME_HOT`, or make the combined provisional-plus-durable adjustment exceed three portfolio-priority points.
 20. Planned checkpoint files, `DATA_NOT_MATURE`, `SOURCE_BLOCKED`, null future checkpoints and unverified prose summaries are not learning evidence.
 21. Run a read-only daily performance pulse for the rolling 35-day published cohort even when no milestone checkpoint is due. A quiet daily pulse is evidence, not an empty run.
-22. Run the governed promotion and Skill release check at least once every 48 hours. Version only material, tested and replay-safe changes; when evidence is insufficient, record `NO_PROMOTION` and `NO_SKILL_CHANGE` and preserve the current version.
+22. Run the governed review and Skill release check twice daily. Fast 24h/72h signals may create observations or manual experiment candidates, but only mature evidence may promote a rule. Version only material, tested and replay-safe changes; when evidence is insufficient, record `NO_PROMOTION` and `NO_SKILL_CHANGE` and preserve the current version.
 23. Apply the user-approved premium/business decision strategy during candidate generation and portfolio framing. Classify serious candidates as `PREMIUM_DECISION_CORE | ADJACENT | EXPLORATION_CANDIDATE`; only a normally eligible controlled test becomes `EXPLORATION`.
 24. `Luxury`, `high-end`, `business`, price, celebrity ownership or exclusivity are not demand providers. Generic luxury lists and narrow affluent services still require normal demand evidence and may not receive eligibility, trend labels or veto relief from the audience-fit classification.
+25. New production runs require a `COMPATIBLE` `qa-handoff-v1`. `LEGACY_UNVERIFIED`, version, artifact, revision or tracking mismatch evidence may be observed historically but may not authorise a new mutation.
+26. Count Search demand by independent acquisition-system family, not by provider label. GSC, official Google Trends and Google Ads Keyword Planner are separate families; aliases or derived views of the same upstream dataset count once.
+27. A positive candidate-level GSC signal counts for demand only when the newest available finalised window has at least three clicks or at least 100 impressions. Preserve smaller samples as `AVAILABLE/INSUFFICIENT_SAMPLE`; never convert them to zero or fall back to an older window merely to pass the gate.
+28. Before QA handoff, a final article may contain at most one VERTU/Concierge integration section. Independent QA must also compare meaningful final heading fingerprints across the batch. Duplicate integration or template-dependent structure is a required fix; missing in-body evidence visuals remain a measured, non-blocking warning during the first phase.
 
 ## Run modes
 
@@ -152,6 +158,7 @@ Read [references/traffic-demand-gate.md](references/traffic-demand-gate.md) comp
 Read [references/realtime-trends.md](references/realtime-trends.md) completely.
 Read [references/editorial-intelligence.md](references/editorial-intelligence.md) completely.
 Read [references/performance-learning.md](references/performance-learning.md) completely.
+Read [references/skill-evolution-scorecard.md](references/skill-evolution-scorecard.md) completely when evaluating or releasing a Skill/process change.
 
 Before discovering topics, query finalised GSC data for the previous 365 days when access is available: Discover and Search page performance, top topic clusters, title/intent patterns, recent 28-day changes, and high-impression low-CTR opportunities. Store `discover-baseline.json`. Never expose credentials. If unavailable, mark `PERFORMANCE_BASELINE_UNAVAILABLE`.
 
@@ -173,7 +180,7 @@ For unstable information, browse and verify current facts. Prefer primary source
 
 ### Stage 2 — Score and select
 
-Validate and score serious candidates with the v3.8.0 traffic-demand, editorial-intelligence, realtime-trends and performance-learning contracts. Calculate the final score with `${VERTU_PDCA_ROOT}/scripts/vertu_content_traffic_gate.py`; do not type a final score into a per-run script. Pass `--editorial-intelligence editorial-intelligence.json --source-velocity source-velocity.json` whenever any candidate declares `EDITORIAL_BREAKOUT`. Pass `--learning-priors ${VERTU_PDCA_ROOT}/output/vertu-signals/learning/active-performance-priors.json` when the durable snapshot validates and `--provisional-learning-priors ${VERTU_PDCA_ROOT}/output/vertu-signals/learning/provisional-performance-priors.json` when the provisional snapshot validates. Use `--trend-mode realtime_hot --realtime-trends realtime-trends.json --trend-market-map trend-market-map.json --hotness-gate hotness-gate.json` when the run promises a hot portfolio so every hot query, market and metric is reconciled against the same fingerprinted run snapshot. The scorer must live-recheck the official Trends feed and primary source before accepting the hot label; source-check failure is a veto, not an invitation to reuse self-declared metadata. Learning priors apply only after normal eligibility and their combined adjustment may change portfolio ordering by at most three points. GSC or Keyword Planner may prove durable demand but cannot make an article `REALTIME_HOT`. A topic needs a passing demand verdict, a computed `80/100`, no veto, and a pre-draft `discover_forecast=PASS`; this forecast is provisional and is not the final post-draft `DISCOVER_READY` verdict. Score at least 30 viable candidates for a ten-article run. Selection is a portfolio decision, not ten independent headline decisions.
+Validate and score serious candidates with the active traffic-demand, editorial-intelligence, realtime-trends and performance-learning contracts. Calculate the final score with `${VERTU_PDCA_ROOT}/scripts/vertu_content_traffic_gate.py`; do not type a final score into a per-run script. Require `score_source=computed_v3_10_0`, retain `demand_signal_qualifications`, and reject a Search-first candidate unless at least two qualified acquisition-system families remain after GSC sample qualification and same-family deduplication. Pass `--editorial-intelligence editorial-intelligence.json --source-velocity source-velocity.json` whenever any candidate declares `EDITORIAL_BREAKOUT`. Pass `--learning-priors ${VERTU_PDCA_ROOT}/output/vertu-signals/learning/active-performance-priors.json` when the durable snapshot validates and `--provisional-learning-priors ${VERTU_PDCA_ROOT}/output/vertu-signals/learning/provisional-performance-priors.json` when the provisional snapshot validates. Use `--trend-mode realtime_hot --realtime-trends realtime-trends.json --trend-market-map trend-market-map.json --hotness-gate hotness-gate.json` when the run promises a hot portfolio so every hot query, market and metric is reconciled against the same fingerprinted run snapshot. The scorer must live-recheck the official Trends feed and primary source before accepting the hot label; source-check failure is a veto, not an invitation to reuse self-declared metadata. Learning priors apply only after normal eligibility and their combined adjustment may change portfolio ordering by at most three points. GSC or Keyword Planner may prove durable demand but cannot make an article `REALTIME_HOT`. A topic needs a passing demand verdict, a computed `80/100`, no veto, and a pre-draft `discover_forecast=PASS`; this forecast is provisional and is not the final post-draft `DISCOVER_READY` verdict. Score at least 30 viable candidates for a ten-article run. Selection is a portfolio decision, not ten independent headline decisions.
 
 Produce `candidates.json`, `traffic-demand.json`, `portfolio-plan.json`, `cluster-support.json`, and one `topic-brief.md` per selected article. Treat the legacy content lanes as diversity guidance rather than publication quotas. When enough candidates independently pass, target roughly 50–70% `PREMIUM_DECISION_CORE` across at least three distinct clusters, 20–30% `ADJACENT`, and no more than 20% `EXPLORATION`; traffic evidence, entity/intent caps and `NO_TOPIC` override these soft targets. Target proven demand, rising interest, verified editorial breakouts, and controlled exploration without lowering the threshold. When one event supports several useful pages, use one event/opportunity page plus no more than two distinct search-intent support pages; define query boundaries and publication order before drafting. If fewer than ten pass, publish fewer than ten; do not generate filler.
 
@@ -189,9 +196,7 @@ Read [references/product-knowledge.md](references/product-knowledge.md) complete
 
 Canonical source:
 
-Resolve the deployment-specific Wiki node from
-`FEISHU_PRODUCT_KB_WIKI_TOKEN`. Do not store a production Wiki or document
-token in the Skill source.
+`${VERTU_PRODUCT_KB_URL}`
 
 Fetch it fresh whenever the article mentions a VERTU product, service, Hermes Agent, VPS, craftsmanship, privacy, health/wellness, price, availability, or specifications. Extract only relevant sections and live-verify volatile fields.
 
@@ -218,6 +223,8 @@ The link plan must count unique destinations rather than anchor tags. Two anchor
 
 Every article needs at least one article-specific value object: an evidence-backed comparison table, decision matrix, timeline, checklist, original synthesis, verified product matrix, or clearly sourced data summary. Do not append a formulaic FAQ unless real reader questions support it.
 
+Use at most one article-specific VERTU/Concierge integration section. A second brand-service section is not additional relevance; consolidate it before QA. For long buyer/comparison articles, plan at least one descriptive in-body evidence visual such as a sourced diagram, route/cabin map, annotated comparison or original chart when rights and factual accuracy permit. The hero does not count as an in-body visual. If no defensible body visual is available, record an article-specific editorial exception rather than adding decoration.
+
 ### Stage 7 — Editorial pass
 
 Run the available `humanizer`/editorial pass. It may improve rhythm, specificity, transitions, and natural voice. It must not change numbers, dates, names, prices, specifications, quotes, source meaning, approved terminology, qualifiers, URLs, or claim labels.
@@ -226,7 +233,9 @@ Reconcile edits against the claim ledger and produce `editorial-changes.md`.
 
 ### Stage 8 — Independent QA and Discover readiness
 
-Hand the draft and artifacts to the configured QA skill. This skill only consumes the result:
+Fingerprint the exact reviewed artifact bundle with `scripts/vertu_qa_handoff.py bundle-fingerprint`, then hand that fingerprint and the draft artifacts to the configured QA skill. This skill only consumes the independent result:
+
+The independent QA run must execute its active editorial-safeguards validator against every final article and the complete current batch. Store `editorial-safeguards.json` with the QA evidence. `DUPLICATE_VERTU_CONCIERGE_INTEGRATION` and `TEMPLATE_DEPENDENT_DRAFT` are unresolved required findings and return the article to writing. `BODY_VISUAL_MISSING` is recorded as a recommended warning only during the first phase and cannot by itself block publication.
 
 ```text
 PASS  → continue
@@ -234,7 +243,7 @@ FIX   → return to Stage 6 with the fix list
 BLOCK → stop and report the veto
 ```
 
-Store `qa-report.md` and the verdict in `handoff.json`. Do not generate an image or mutate Sanity before `PASS`.
+Store `qa-report.md`, `qa-handoff-preflight.json`, the immutable QA Run ID/Base record ID, policy version/hash/profile, result fingerprint and verdict in `handoff.json`. Validate it as `release_gate_role=preflight`, `source_identity.type=artifact_bundle`, and `compatibility_status=COMPATIBLE`. Do not generate an image or mutate Sanity before this R0 preflight `PASS`.
 
 After QA `PASS`, produce `discover-readiness.json` covering historical cluster evidence, timeliness, title/preview, originality/story, concrete reader decision, image specificity, and portfolio diversity. Use only `DISCOVER_READY | DISCOVER_FIX | DISCOVER_REJECT`. Only `DISCOVER_READY` continues.
 
@@ -251,8 +260,10 @@ If `image_gen` is unavailable, mark `WAITING_FOR_IMAGE`. Do not silently switch 
 Read [references/automation-contract.md](references/automation-contract.md) before automated delivery.
 
 - `local_draft`: stop with the artifact package.
-- `sanity_draft`: introspect the live schema, create/update a draft only, and verify by query.
-- `production`: only in `publish_approved` mode with article-specific approval and current QA `PASS`.
+- `sanity_draft`: introspect the live schema, create/update a draft only, verify by query, then run independent R1 QA against that exact Draft revision.
+- `production`: only in `publish_approved` mode or the narrow standing `vertu-10` current-run profile, with compatible R0 preflight and R1 prepublish QA `PASS` evidence.
+
+Before production publication, write and validate `qa-handoff-prepublish.json` with `release_gate_role=prepublish`, `source_identity.type=sanity_draft_revision`, the exact Draft document ID/revision and the same `draft_bundle_sha256`. Fail closed on a contract, producer, policy, artifact, revision, QA Run or unresolved-finding mismatch. After publication and live verification, reconcile `qa-handoff-postpublish.json` with `release_gate_role=postpublish_audit` and the exact published revision; missing compatible R2 evidence makes the chain `HANDOFF_INCOMPLETE`, never silent success.
 
 Never trust a historical Sanity body shape. Introspect body, SEO, image, language, section, author, status, and draft conventions before mutation. Publishing scripts must reference a pre-existing approved author and must never create or reshape an author as a side effect. Confirm the public author profile returns HTTP 200, the visible byline links to it, and `BlogPosting.author` matches; missing or broken authorship is a release blocker. The page template owns the visible byline: do not prepend a second `By ...` paragraph to `rawHtml` or Portable Text. If the live section template does not provide a visible linked author, return `AUTHOR_BLOCKED` instead of compensating with an in-body byline. Produce `author-verification.json`.
 
@@ -264,7 +275,9 @@ Report selected topic and score, thesis, reader, draft path and slug, evidence/p
 
 ### Stage 12 — Performance feedback
 
-For published articles, run one read-only daily pulse for the rolling 35-day cohort and preserve milestone measurements at 24 hours, 72 hours, 7 days, and 28 days. Use the reusable monitoring contract at `${VERTU_PDCA_ROOT}/docs/03-运行/VERTU-Content-Performance-Monitoring-Contract.md` when available.
+For published articles, run one read-only daily pulse for the rolling 35-day cohort and preserve milestone measurements at 24 hours, 72 hours, 7 days, and 28 days. Use the reusable monitoring contract at `${VERTU_PDCA_ROOT}/contracts/VERTU-Content-Performance-Monitoring-Contract.md` when available.
+
+Build the cohort dynamically with `${VERTU_PDCA_ROOT}/scripts/vertu_content_monitor_runtime.py`; never import a frozen inventory snapshot. Prefer `handoff.state=PUBLISHED`. When that state is stale or absent, accept `PUBLISHED_RECONCILED` only when the same run has a timestamped `publish-result.json`, `run-summary.json status=SUCCESS`, and every corresponding live-verification result passes. Record the drift for repair. Runs through 2026-07-11 with missing first-generation evidence use `LEGACY_EVIDENCE_EXCEPTION` and are excluded from checkpoint and learning eligibility rather than blocking the current cohort.
 
 - `daily`: verify the rolling cohort is live, read the latest finalised GSC/available GA4 state, surface new technical, delivery, demand or packaging anomalies, and record a visible pulse even when no milestone is due.
 - `24h`: verify delivery, canonical/indexability, image, authorship/schema, and preliminary GA4 engagement. Do not judge GSC performance yet.
@@ -272,23 +285,17 @@ For published articles, run one read-only daily pulse for the rolling 35-day coh
 - `7d`: make the first evidence-backed optimisation decision and propose at most one major variable change.
 - `28d`: classify the mature result, check cannibalisation, verify experiments, and feed validated portfolio learnings into future baselines.
 
-Track Discover clicks/impressions/CTR by canonical URL, Search clicks/impressions/CTR/queries/position, and GA4 engagement and qualified product journeys when available. Compare articles at the same age against topic-cluster and publication-cohort baselines. Missing or delayed data is `DATA_NOT_MATURE`, never zero. Historical checkpoints are immutable.
+Track Discover clicks/impressions/CTR by canonical URL, Search clicks/impressions/CTR/queries/position, and GA4 engagement and qualified product journeys when available. Compare articles at the same age against topic-cluster and publication-cohort baselines. Missing or delayed data is `DATA_NOT_MATURE`, never zero. Historical checkpoints are immutable. Execute a bounded checkpoint-balanced queue on every monitoring run; reporting due work without executing the bounded queue or recording its exact source/identity blocker is incomplete. A failed mandatory GSC or GA4 query is `SOURCE_BLOCKED` and retryable.
+
+After local checkpoint execution, build the canonical Base manifest with `${VERTU_PDCA_ROOT}/scripts/vertu_content_monitor_base_handoff.py`. Production `--apply` requires the same execution's canonical start-ledger receipt in `运行中` and rejects an execution-ID mismatch. The handoff performs exact business-key lookups, creates or reconciles one `监控运行` row and deterministic `节点复盘` observations, then reads them back. `SOURCE_BLOCKED` and `DATA_NOT_MATURE` remain audit observations with null metrics. T+24h is technical/preliminary only; learning eligibility starts with source-complete mature 72h/7d/28d evidence. The handoff performs no Sanity mutation and does not approve experiments.
 
 Run mature 72-hour checkpoints through `${VERTU_PDCA_ROOT}/scripts/vertu_content_traffic_gate.py classify-72h`. A mature checkpoint that passes a Search or Discover sample gate must not remain generic `INSUFFICIENT_DATA`; classify the concrete CTR, coverage, packaging, positive-signal, or intent opportunity. Preliminary 72-hour and 7-day results may inform the next run, but only verified 28-day experiments become durable scoring priors. A user-approved editorial strategy may shape the candidate pool immediately, but it remains separate from the governed learned adjustment and may not be presented as a durable causal conclusion.
 
-Run the governed learning and Skill release job in `references/performance-learning.md` at least once every 48 hours. It must deduplicate checkpoint retries, reject planned/immature/blocked inputs, refresh or expire provisional priors, write an immutable snapshot, test and replay every proposed change, and store each proposal, activation, expiry, rejection or rollback in canonical Base `Skill Change Log`. A 48-hour observation is not automatically a permanent skill rule, and a run without material evidence must not force a version bump.
+Run the governed learning and Skill release job in `references/performance-learning.md` twice daily. It must deduplicate checkpoint retries, reject planned/immature/blocked inputs, refresh or expire provisional priors, write an immutable snapshot, test and replay every proposed change, and store each proposal, activation, expiry, rejection or rollback in canonical Base `Skill Change Log`. Route every material Skill or governing-process change through `references/skill-evolution-scorecard.md`: absolute structural scores are diagnostic only, same-rubric paired comparison controls keep/revert, and traffic-affecting changes require mature production outcomes before promotion eligibility. A same-day traffic spike is an observation, not automatically a permanent skill rule, and a run without material evidence must not force a version bump.
 
 The monitor may prepare a title, meta, hero, introduction, content, internal-link, or freshness change proposal. It must not mutate Sanity without article-specific approval, a mutation preview, and a fresh `_rev` conflict check. Label preliminary data and do not turn one spike into a permanent rule.
 
-Persist monitoring to the Feishu Base configured by `FEISHU_BASE_TOKEN` using
-user identity, the deployment-specific schema map and the current `lark-base`
-contract. Use the configured Article Assets table for current article state,
-immutable Checkpoint Review rows for each checkpoint, Change Experiments for
-approval and verification lineage, and immutable Monitor Runs for every
-automation execution. Record quiet outcomes such as `NO_DUE_CHECKPOINT`,
-`DATA_NOT_MATURE`, and `NO_ACTIONABLE_CHANGE`. Never overwrite historical
-checkpoint/run rows. If a Base write fails, keep the local evidence and report
-`FEISHU_BASE_WRITE_FAILED` after bounded retries.
+Persist monitoring only to the canonical Feishu Base `VERTU 内容与 SEO 运营闭环` (`${FEISHU_BASE_TOKEN}`) using user identity and the current `lark-base` contract. Use `文章资产` for current article state, immutable `节点复盘` rows for each checkpoint, `修改实验` for approval and verification lineage, and immutable `监控运行` rows for every automation execution. Record quiet outcomes such as `NO_DUE_CHECKPOINT`, `DATA_NOT_MATURE`, and `NO_ACTIONABLE_CHANGE`. Never overwrite historical checkpoint/run rows. If a Base write fails, keep the local evidence and report `FEISHU_BASE_WRITE_FAILED` after bounded retries.
 
 ## Artifact contract
 
@@ -319,6 +326,9 @@ image-brief.md
 visual-verification.json
 author-verification.json
 qa-report.md
+qa-handoff-preflight.json
+qa-handoff-prepublish.json
+qa-handoff-postpublish.json
 handoff.json
 performance-plan.json
 performance/<slug>/24h.json
@@ -331,6 +341,8 @@ performance/<slug>/experiment-ledger.json
 learning-snapshot.json
 active-performance-priors.json
 provisional-performance-priors.json
+skill-scorecard-input.json
+skill-scorecard.json
 ```
 
 Missing optional stages must have an explicit status in `handoff.json`.
@@ -346,6 +358,7 @@ A writing run is complete when every selected topic has auditable candidate-leve
 - [Realtime trends](references/realtime-trends.md)
 - [Editorial intelligence](references/editorial-intelligence.md)
 - [Performance learning](references/performance-learning.md)
+- [Skill evolution scorecard](references/skill-evolution-scorecard.md)
 - [Product knowledge](references/product-knowledge.md)
 - [Writing contract](references/writing-contract.md)
 - [Author policy](references/author-policy.md)
