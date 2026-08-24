@@ -173,6 +173,59 @@ def live_verifications(snapshot):
     }
 
 
+def d2tr_context(observed_at=NOW_ISO):
+    payload = {
+        "contract_version": "d2tr-discover-context-v1",
+        "provider": "d2tr_public_discover",
+        "official_google_source": False,
+        "may_create_google_demand": False,
+        "may_create_realtime_hot": False,
+        "credentials_included": False,
+        "execution_id": "d2tr-test",
+        "observed_at": observed_at,
+        "expires_at": "2099-09-05T00:00:00Z",
+        "status": "AVAILABLE",
+        "source_snapshot_fingerprint": "source-fingerprint",
+        "markets": {
+            "US": {
+                "status": "AVAILABLE",
+                "volatility": {
+                    "name": "ALL",
+                    "status": "AVAILABLE",
+                    "current_value": 7.4,
+                    "trend": "RISING",
+                    "state": "ACTIVE",
+                    "source_generated_at": observed_at,
+                },
+                "format_groups": {
+                    "Service": {
+                        "name": "Service",
+                        "status": "AVAILABLE",
+                        "current_value": 6.4,
+                        "trend": "RISING",
+                        "state": "ACTIVE",
+                        "source_generated_at": observed_at,
+                    }
+                },
+                "topics": {
+                    "Travel": {
+                        "name": "Travel",
+                        "status": "AVAILABLE",
+                        "current_value": 7.1,
+                        "trend": "RISING",
+                        "state": "ACTIVE",
+                        "source_generated_at": observed_at,
+                    }
+                },
+                "formats": {},
+                "categories": {},
+            }
+        },
+    }
+    payload["snapshot_fingerprint"] = traffic_gate._snapshot_fingerprint(payload)
+    return payload
+
+
 class CandidateEvaluationTests(unittest.TestCase):
     def test_valid_search_candidate_gets_computed_score_and_passes(self):
         result = evaluate_with_snapshot(valid_candidate())
@@ -558,6 +611,29 @@ class CandidateEvaluationTests(unittest.TestCase):
         )
 
         self.assertIn("unverified_realtime_hot_label", result["vetoes"])
+
+    def test_primary_source_partial_content_is_valid_for_range_verification(self):
+        candidate = valid_candidate()
+        snapshot = realtime_snapshot()
+        candidate["demand_signals"][1]["metrics"]["snapshot_fingerprint"] = snapshot[
+            "snapshot_fingerprint"
+        ]
+        candidate["demand_signals"][1]["metrics"]["primary_source_http_status"] = 206
+        verification = live_verifications(snapshot)
+        verification["primary_verified"]["https://example.com/official-launch"] = {
+            "verified": True,
+            "http_status": 206,
+            "matched_relevance_terms": ["travel", "watch"],
+        }
+
+        result = traffic_gate.evaluate_candidate(
+            candidate,
+            traffic_gate._realtime_topic_registry(snapshot),
+            verification["trend_verified"],
+            verification["primary_verified"],
+        )
+
+        self.assertNotIn("unverified_realtime_hot_label", result["vetoes"])
 
     def test_blank_market_and_missing_primary_source_are_rejected(self):
         candidate = valid_candidate()
@@ -945,6 +1021,124 @@ class PortfolioSelectionTests(unittest.TestCase):
         self.assertEqual(selected["provisional_learning_adjustment"], 2)
         self.assertEqual(selected["learning_adjustment"], 2)
         self.assertEqual(len(selected["matched_provisional_priors"]), 2)
+
+    def test_d2tr_context_reorders_only_already_eligible_candidates(self):
+        snapshot = realtime_snapshot()
+        first = valid_candidate(
+            candidate_id="first",
+            slug="first",
+            intent_key="first-intent",
+        )
+        second = valid_candidate(
+            candidate_id="second",
+            slug="second",
+            intent_key="second-intent",
+            d2tr_context={
+                "market": "US",
+                "topic_category": "Travel",
+                "format_group": "Service",
+            },
+        )
+        for candidate in (first, second):
+            candidate["publication_run_id"] = snapshot["run_id"]
+            candidate["demand_signals"][1]["metrics"]["snapshot_fingerprint"] = snapshot[
+                "snapshot_fingerprint"
+            ]
+
+        portfolio = traffic_gate.select_portfolio(
+            [first, second],
+            max_articles=1,
+            realtime_trends_snapshot=snapshot,
+            live_source_verifications=live_verifications(snapshot),
+            d2tr_market_context=d2tr_context(),
+        )
+
+        selected = portfolio["selected"][0]
+        self.assertEqual(selected["candidate_id"], "second")
+        self.assertEqual(selected["d2tr_market_context_adjustment_raw"], 2)
+        self.assertEqual(selected["d2tr_market_context_adjustment_applied"], 2)
+        self.assertEqual(selected["total_priority_adjustment"], 2)
+        self.assertEqual(selected["score"], selected["raw_score"])
+        self.assertTrue(selected["eligible"])
+        self.assertFalse(portfolio["hard_boundaries"]["d2tr_can_create_demand"])
+
+    def test_d2tr_context_cannot_rescue_vetoed_candidate(self):
+        snapshot = realtime_snapshot()
+        candidate = valid_candidate(
+            vetoes=["forced_brand_insertion"],
+            d2tr_context={
+                "market": "US",
+                "topic_category": "Travel",
+                "format_group": "Service",
+            },
+        )
+        candidate["publication_run_id"] = snapshot["run_id"]
+        candidate["demand_signals"][1]["metrics"]["snapshot_fingerprint"] = snapshot[
+            "snapshot_fingerprint"
+        ]
+
+        portfolio = traffic_gate.select_portfolio(
+            [candidate],
+            max_articles=1,
+            realtime_trends_snapshot=snapshot,
+            live_source_verifications=live_verifications(snapshot),
+            d2tr_market_context=d2tr_context(),
+        )
+
+        rejected = portfolio["rejected"][0]
+        self.assertFalse(rejected["eligible"])
+        self.assertEqual(rejected["d2tr_market_context_adjustment_raw"], 0)
+        self.assertEqual(rejected["selection_priority_score"], rejected["score"])
+
+    def test_learning_and_d2tr_share_one_three_point_cap(self):
+        snapshot = realtime_snapshot()
+        candidate = valid_candidate(
+            cluster_id="preferred-cluster",
+            d2tr_context={
+                "market": "US",
+                "topic_category": "Travel",
+                "format_group": "Service",
+            },
+        )
+        candidate["publication_run_id"] = snapshot["run_id"]
+        candidate["demand_signals"][1]["metrics"]["snapshot_fingerprint"] = snapshot[
+            "snapshot_fingerprint"
+        ]
+        priors = {
+            "contract_version": "performance-learning-v1",
+            "status": "ACTIVE",
+            "priors": [
+                {
+                    "prior_id": "prior-preferred",
+                    "state": "ACTIVE",
+                    "learning_level": "DURABLE_PRIOR",
+                    "scope_type": "cluster_id",
+                    "scope_value": "preferred-cluster",
+                    "selection_adjustment": 3,
+                    "evidence": {
+                        "d28_article_count": 3,
+                        "publication_run_count": 2,
+                        "verified_experiment_count": 0,
+                    },
+                }
+            ],
+        }
+        priors["snapshot_fingerprint"] = traffic_gate._snapshot_fingerprint(priors)
+
+        portfolio = traffic_gate.select_portfolio(
+            [candidate],
+            max_articles=1,
+            realtime_trends_snapshot=snapshot,
+            live_source_verifications=live_verifications(snapshot),
+            learning_priors=priors,
+            d2tr_market_context=d2tr_context(),
+        )
+
+        selected = portfolio["selected"][0]
+        self.assertEqual(selected["learning_adjustment"], 3)
+        self.assertEqual(selected["d2tr_market_context_adjustment_raw"], 2)
+        self.assertEqual(selected["d2tr_market_context_adjustment_applied"], 0)
+        self.assertEqual(selected["total_priority_adjustment"], 3)
 
     def test_portfolio_respects_ceiling_entity_cap_and_no_topic_slots(self):
         candidates = []

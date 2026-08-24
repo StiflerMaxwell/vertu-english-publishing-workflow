@@ -106,7 +106,7 @@ The output contract is `skill-evolution-scorecard-v1`. Preserve its input and sc
 
 ## Feishu audit
 
-Use only canonical Base `VERTU 内容与 SEO 运营闭环`, table `Skill Change Log` (`${FEISHU_SKILL_CHANGE_LOG_TABLE_ID}`). Search exact `Change ID` first.
+Use only canonical Base `VERTU 内容与 SEO 运营闭环`, table `Skill Change Log` (`${VERTU_SKILL_CHANGE_LOG_TABLE_ID}`). Search exact `Change ID` first.
 
 Record:
 

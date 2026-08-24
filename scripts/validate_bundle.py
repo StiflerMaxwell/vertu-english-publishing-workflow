@@ -26,6 +26,7 @@ REQUIRED_FILES = {
     "contracts/VERTU-QA-Handoff-Contract.md",
     "contracts/VERTU-vvv-Group-Receipt-Template.md",
     "docs/PUBLIC-RELEASE-CHECKLIST.md",
+    "docs/LOOP-ENGINEERING-REVIEW.md",
     "skills/vertu-english-blog-pipeline/SKILL.md",
     "skills/vertu-english-blog-pipeline/references/README.md",
     "skills/vertu-seo-publish-gate/SKILL.md",
@@ -40,6 +41,9 @@ REQUIRED_FILES = {
     "scripts/vertu_skill_evolution_scorecard.py",
     "scripts/vertu_google_trends_realtime.py",
     "scripts/vertu_content_learning_flywheel.py",
+    "scripts/vertu_content_loop_runtime.py",
+    "scripts/vertu_daily_publishing_quota.py",
+    "scripts/vertu_d2tr_discover_monitor.py",
     "scripts/vertu-vvv-notify.ts",
 }
 
@@ -54,6 +58,7 @@ ACTIVE_REFERENCES = {
     "writing-contract.md",
     "author-policy.md",
     "automation-contract.md",
+    "loop-runtime-governance.md",
 }
 
 TEXT_SUFFIXES = {

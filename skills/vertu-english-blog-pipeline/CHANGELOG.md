@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.14.0 — 2026-08-24
+
+- Added `vertu-content-loop-runtime-v1` as a local control plane for producer, QA, monitor, repair, trend and learning loops while keeping canonical Base authoritative.
+- Added atomic mutation-scope leases, owner-checked idempotent release, stale-lease recovery and a file-based global mutation kill switch.
+- Added explicit wall-clock, child-task, candidate and per-scope attempt budgets so repeated or concurrent work stops without weakening editorial or publication gates.
+- Added twice-daily loop-health audit evidence for expired claims, orphan locks, malformed locks and running executions with missing claims.
+- Kept the traffic score source, demand thresholds, ten-article quota, independent QA policy, Discover readiness and publication authority unchanged.
+- Review basis: fourteen consecutive successful ten-article runs from 2026-08-11 through 2026-08-24, zero verified `REALTIME_HOT` selections in that window, candidate expansion up to 178, and repeated source-blocked monitor pulses.
+
+## 3.13.0 — 2026-08-10
+
+- Changed the named `vertu-10` profile from a zero-minimum portfolio to a hard minimum of ten fully live-verified, canonical-Base-handed-off articles per scheduled run.
+- Added cumulative 30/60/90/120 candidate expansion and downstream replacement semantics without lowering demand, score, diversity, non-News, QA, Discover, image, author, link, live, or handoff gates.
+- Added deterministic `daily-publishing-quota-v1` states: `EXPAND_REQUIRED`, `REPLACEMENT_REQUIRED`, `PRODUCTION_IN_PROGRESS`, `COMPLETE`, and `DAILY_QUOTA_BLOCKED`.
+- Made `NO_TOPIC` invalid as successful completion for `vertu-10`; exhausted bounded supply now produces an explicit audited blocker.
+
 ## 3.11.0 — 2026-08-05
 
 - Counted demand evidence by acquisition-system family so aliases and derived views of one upstream source cannot satisfy an independence requirement twice.

@@ -2,7 +2,7 @@
 name: vertu-seo-publish-gate
 description: VERTU 海外官网 SEO 内容发布前 QA Gate。用于审核 QuickCreator / AI / 人工草稿，输出 PASS / FIX / BLOCK、具体修改意见、SEO 建议、Sanity Patch Plan 和写入权限报告。授权后只允许写入 Sanity Draft，禁止直接 Publish。
 metadata:
-  version: "0.7.0"
+  version: "0.7.1"
   platforms: "openclaw, hermes, lobster"
   owner: "VERTU Overseas Web"
   risk_level: "controlled"
@@ -10,7 +10,7 @@ metadata:
 
 # VERTU SEO Publish Gate
 
-Current policy version: `0.7.0`.
+Current policy version: `0.7.1`.
 
 ## 1. Skill Purpose
 
@@ -489,7 +489,8 @@ Deterministic context routing is mandatory:
 
 - A literal term match is recall only and must not directly set the final compliance verdict.
 - Use `scripts/vertu_qa_policy.py restricted-context` or an equivalent implementation that emits `rule_id`, `classification`, `matched_excerpt`, `auto_block`, and `semantic_review_required`.
-- Clear travel, booking, payment, offer, fare, ticket, upgrade or transaction senses of `treat` / `treatment` are `NON_MEDICAL_CONTEXT` and must not auto-block. Example: `Treat the offer as a new transaction.`
+- Clear idiomatic and non-medical senses of `treat` / `treatment` are `NON_MEDICAL_CONTEXT` and must not auto-block. This includes `treat X as Y`, fare/upgrade treatment, insurance-policy wording, pricing, research, visual, technical and transaction contexts. Example: `Treat the offer as a new transaction.`
+- Clear technical senses of `diagnose` / `diagnosis` / `diagnostic`, such as diagnosing a failure or a repair issue, are `NON_MEDICAL_CONTEXT` and must not auto-block.
 - An affirmative medical context such as `This device can treat hypertension.` is `AFFIRMATIVE_MEDICAL_CLAIM` and blocks.
 - When medical and non-medical terms coexist in the same local clause, affirmative medical context takes precedence and blocks. A negation in an earlier, adversarially separated clause does not negate a later affirmative claim.
 - Clear negation/disclaimer context is `NEGATION_OR_DISCLAIMER`: do not auto-block, but require semantic review.

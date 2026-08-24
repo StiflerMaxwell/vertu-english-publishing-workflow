@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 — 2026-08-13
+
+- Prevented medical-claim false positives for idiomatic `treat X as Y`, fare/upgrade treatment, insurance-policy wording and technical diagnosis contexts.
+- Preserved affirmative medical capability blocking and exact current-revision QA identity requirements.
+
 ## 0.7.0 - 2026-08-05
 
 Changes:

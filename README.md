@@ -8,8 +8,8 @@ contracts, and notification sender used by the VERTU publishing chain.
 
 Current packaged versions:
 
-- editorial pipeline: `vertu-english-blog-pipeline` v3.11.0
-- independent SEO QA gate: `vertu-seo-publish-gate` v0.7.0
+- editorial pipeline: `vertu-english-blog-pipeline` v3.14.0
+- independent SEO QA gate: `vertu-seo-publish-gate` v0.7.1
 - automation profile: `vertu-10`, daily at 09:00 Asia/Hong_Kong
 
 The repository is designed as a reference implementation. It contains no
@@ -20,6 +20,7 @@ authority. Operators must supply their own integrations and configuration.
 
 ```text
 GSC + Google Trends + editorial intelligence + live inventory
+  -> acquire bounded local loop mutation scopes
   -> qualify demand by independent acquisition-system family
   -> require a minimum candidate-level GSC sample
   -> score at least 30 candidates
@@ -34,6 +35,7 @@ GSC + Google Trends + editorial intelligence + live inventory
   -> vvv group receipt
   -> 24h / 72h / 7d / 28d monitoring
   -> governed performance-learning priors
+  -> loop-health audit and owner-checked scope release
   -> paired review + replay + mature production scorecard
 ```
 
@@ -46,7 +48,7 @@ mutation, live verification, and monitoring remain separate gates.
   research, writing, evidence, links, authorship and handoff contracts.
 - `skills/vertu-seo-publish-gate/` — independent PASS/FIX/BLOCK QA contract.
 - `scripts/` — deterministic traffic scorer, Google Trends collector, governed
-  learning flywheel and vvv notification sender.
+  learning flywheel, quota/runtime guards and vvv notification sender.
 - `automation/vertu-10.template.toml` — sanitised scheduler template.
 - `contracts/` — automation-chain, performance-monitoring and group-receipt
   contracts.
@@ -57,12 +59,19 @@ mutation, live verification, and monitoring remain separate gates.
 Architecture and governance:
 
 - [Feishu governance and self-evolving Skills](docs/FEISHU-MAINTENANCE-AND-SKILL-EVOLUTION.md)
+- [Loop Engineering review and VERTU adaptation](docs/LOOP-ENGINEERING-REVIEW.md)
 - [Public release checklist](docs/PUBLIC-RELEASE-CHECKLIST.md)
 
 ## Safety boundaries
 
 - Automatic content must never use the `news` section or a `/news/` URL.
-- Ten articles is a ceiling, not a quota. `NO_TOPIC` is preferable to filler.
+- Ten articles remains a ceiling for ordinary profiles. The named `vertu-10`
+  profile is the explicit exception: it requires ten fully live-verified,
+  handed-off articles through bounded 30/60/90/120 candidate expansion without
+  lowering any editorial or publication gate.
+- Protected pointer, Base, Sanity and Skill-release mutations require a local
+  runtime `ALLOW` receipt plus the normal canonical Base start ledger. Pause,
+  collision, budget, attempt, state and release failures remain explicit.
 - A production mutation requires a successful start-audit record, exact
   run-scoped document IDs, fresh schema/revision checks and a mutation preview.
 - Published success requires HTTP 200, exact canonical, linked institutional
@@ -88,6 +97,7 @@ See [Installation](docs/INSTALL.md), then run:
 ```bash
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/validate_bundle.py
+python3 scripts/vertu_content_loop_runtime.py --help
 pnpm install
 pnpm notify:preview -- --body-file ./path/to/message.txt
 ```

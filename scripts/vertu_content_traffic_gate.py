@@ -64,9 +64,11 @@ LEARNING_SCOPE_FIELDS = {
     "portfolio_bucket",
 }
 MAX_LEARNING_ADJUSTMENT = 3.0
-TRAFFIC_GATE_CONTRACT_VERSION = "traffic-acquisition-v3.10.0"
-TRAFFIC_GATE_RUNTIME_VERSION = "3.10.0"
-SCORE_SOURCE = "computed_v3_10_0"
+D2TR_MAX_ADJUSTMENT = 2.0
+D2TR_MAX_CONTEXT_AGE_HOURS = 8.0
+TRAFFIC_GATE_CONTRACT_VERSION = "traffic-acquisition-v3.12.0"
+TRAFFIC_GATE_RUNTIME_VERSION = "3.12.0"
+SCORE_SOURCE = "computed_v3_12_0"
 GSC_MIN_CLICKS = 3
 GSC_MIN_IMPRESSIONS = 100
 SEARCH_DEMAND_PROVIDER_FAMILIES = {
@@ -267,8 +269,12 @@ def verify_live_sources(
             matched_terms = sorted(
                 term for term in primary_requests[url] if term in text
             )
+            # The verifier deliberately requests a byte range. Standards-compliant
+            # origin servers may therefore return 206 Partial Content, which is a
+            # successful response for this exact request and must not invalidate an
+            # otherwise relevant primary source.
             primary_verified[url] = {
-                "verified": status == 200 and bool(matched_terms),
+                "verified": status in {200, 206} and bool(matched_terms),
                 "http_status": status,
                 "final_url": final_url,
                 "matched_relevance_terms": matched_terms,
@@ -427,14 +433,204 @@ def _validated_provisional_learning_priors(
     return validated
 
 
+def _validated_d2tr_market_context(
+    payload: Any,
+    now: Optional[datetime] = None,
+) -> Tuple[Optional[Dict[str, Any]], str]:
+    """Validate optional independent Discover-market context.
+
+    D2TR is not an official Google demand provider.  Invalid supplied
+    artifacts fail closed; unavailable, blocked or stale artifacts simply
+    produce no ordering adjustment.
+    """
+
+    if payload is None:
+        return None, "NOT_PROVIDED"
+    if not isinstance(payload, dict):
+        raise ValueError("d2tr-market-context artifact must be an object")
+    if payload.get("contract_version") != "d2tr-discover-context-v1":
+        raise ValueError(
+            "d2tr-market-context contract_version must be d2tr-discover-context-v1"
+        )
+    if payload.get("snapshot_fingerprint") != _snapshot_fingerprint(payload):
+        raise ValueError("d2tr-market-context snapshot fingerprint mismatch")
+    if payload.get("provider") != "d2tr_public_discover":
+        raise ValueError("d2tr-market-context provider mismatch")
+    if payload.get("official_google_source") is not False:
+        raise ValueError("d2tr-market-context must not claim official Google provenance")
+    if payload.get("may_create_google_demand") is not False:
+        raise ValueError("d2tr-market-context may not create Google demand")
+    if payload.get("may_create_realtime_hot") is not False:
+        raise ValueError("d2tr-market-context may not create REALTIME_HOT")
+    if payload.get("credentials_included") is not False:
+        raise ValueError("d2tr-market-context must not include credentials")
+    if not isinstance(payload.get("markets"), dict):
+        raise ValueError("d2tr-market-context markets must be an object")
+    source_fingerprint = str(payload.get("source_snapshot_fingerprint") or "")
+    if not source_fingerprint:
+        raise ValueError("d2tr-market-context source snapshot fingerprint is missing")
+    status = str(payload.get("status") or "").upper()
+    if status not in {"AVAILABLE", "PARTIAL", "SOURCE_BLOCKED"}:
+        raise ValueError("d2tr-market-context status is invalid")
+    if status == "SOURCE_BLOCKED":
+        return None, "SOURCE_BLOCKED"
+    observed_at = _iso_datetime(payload.get("observed_at"))
+    current_time = now or datetime.now(timezone.utc)
+    if observed_at is None or observed_at > current_time:
+        raise ValueError("d2tr-market-context observed_at is invalid")
+    if (current_time - observed_at).total_seconds() > D2TR_MAX_CONTEXT_AGE_HOURS * 3600:
+        return None, "STALE"
+    return copy.deepcopy(payload), status
+
+
+def _normalised_signal_lookup(mapping: Any, expected: Any) -> Optional[Dict[str, Any]]:
+    expected_key = _trend_topic_key(expected)
+    if not expected_key or not isinstance(mapping, dict):
+        return None
+    for key, value in mapping.items():
+        if _trend_topic_key(key) == expected_key and isinstance(value, dict):
+            return value
+    return None
+
+
+def _fresh_d2tr_signal(signal: Any, now: datetime) -> Optional[Dict[str, Any]]:
+    if not isinstance(signal, dict) or signal.get("status") != "AVAILABLE":
+        return None
+    generated_at = _iso_datetime(signal.get("source_generated_at"))
+    if generated_at is None or generated_at > now:
+        return None
+    if (now - generated_at).total_seconds() > D2TR_MAX_CONTEXT_AGE_HOURS * 3600:
+        return None
+    return signal
+
+
+def _d2tr_signal_strength(signal: Dict[str, Any], dimension: str) -> str:
+    current = _number(signal.get("current_value"))
+    change = _number(signal.get("change_value"))
+    trend = str(signal.get("trend") or "").upper()
+    state = str(signal.get("state") or "").upper()
+    if dimension in {"topic_category", "format_group"}:
+        if (current is not None and current >= 7) or state == "SUSTAINED":
+            return "STRONG"
+        if trend == "RISING" and current is not None and current >= 5:
+            return "STRONG"
+        if (current is not None and current >= 5) or trend == "RISING" or state == "ACTIVE":
+            return "MODERATE"
+    elif dimension == "format_type":
+        if trend == "RISING" and change is not None and change >= 1:
+            return "STRONG"
+        if trend == "RISING" or (change is not None and change >= 0.5):
+            return "MODERATE"
+    elif dimension == "content_category":
+        if change is not None and change >= 15:
+            return "STRONG"
+        if change is not None and change >= 5:
+            return "MODERATE"
+    return "NONE"
+
+
+def _d2tr_context_adjustment(
+    candidate: Dict[str, Any],
+    context: Optional[Dict[str, Any]],
+    now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    result = {
+        "raw_adjustment": 0.0,
+        "market": None,
+        "matched_dimensions": [],
+        "strong_match_count": 0,
+        "moderate_match_count": 0,
+        "market_anomaly": False,
+        "reason": "NO_CONTEXT",
+    }
+    if context is None:
+        return result
+    declaration = candidate.get("d2tr_context")
+    if not isinstance(declaration, dict):
+        result["reason"] = "CANDIDATE_CONTEXT_NOT_DECLARED"
+        return result
+    market = str(declaration.get("market") or "").strip().upper()
+    result["market"] = market or None
+    market_payload = (context.get("markets") or {}).get(market)
+    if not market or not isinstance(market_payload, dict):
+        result["reason"] = "MARKET_UNAVAILABLE"
+        return result
+    current_time = now or datetime.now(timezone.utc)
+    volatility = _fresh_d2tr_signal(market_payload.get("volatility"), current_time)
+    if volatility is not None:
+        volatility_index = _number(volatility.get("current_value"))
+        result["market_anomaly"] = bool(
+            (volatility_index is not None and volatility_index >= 7)
+            or str(volatility.get("state") or "").upper() == "SUSTAINED"
+        )
+    dimension_maps = {
+        "topic_category": "topics",
+        "format_group": "format_groups",
+        "format_type": "formats",
+        "content_category": "categories",
+    }
+    matches = []
+    for dimension, market_field in dimension_maps.items():
+        expected = declaration.get(dimension)
+        signal = _normalised_signal_lookup(market_payload.get(market_field), expected)
+        signal = _fresh_d2tr_signal(signal, current_time)
+        if signal is None:
+            continue
+        strength = _d2tr_signal_strength(signal, dimension)
+        if strength == "NONE":
+            continue
+        matches.append(
+            {
+                "dimension": dimension,
+                "value": expected,
+                "strength": strength,
+                "current_value": signal.get("current_value"),
+                "change_value": signal.get("change_value"),
+                "trend": signal.get("trend"),
+                "state": signal.get("state"),
+                "source_generated_at": signal.get("source_generated_at"),
+            }
+        )
+    strong_count = sum(row["strength"] == "STRONG" for row in matches)
+    moderate_count = sum(row["strength"] == "MODERATE" for row in matches)
+    if strong_count >= 2 or (result["market_anomaly"] and len(matches) >= 2):
+        adjustment = 2.0
+        reason = "MULTI_DIMENSION_BREAKOUT"
+    elif strong_count >= 1 or moderate_count >= 2:
+        adjustment = 1.0
+        reason = "SUPPORTED_MARKET_CONTEXT"
+    else:
+        adjustment = 0.0
+        reason = "NO_ACTIONABLE_MATCH"
+    result.update(
+        {
+            "raw_adjustment": adjustment,
+            "matched_dimensions": matches,
+            "strong_match_count": strong_count,
+            "moderate_match_count": moderate_count,
+            "reason": reason,
+        }
+    )
+    return result
+
+
 def _apply_learning_priority(
-    candidate: Dict[str, Any], priors: Sequence[Dict[str, Any]]
+    candidate: Dict[str, Any],
+    priors: Sequence[Dict[str, Any]],
+    d2tr_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     row = copy.deepcopy(candidate)
     if not row.get("eligible"):
         row["durable_learning_adjustment"] = 0.0
         row["provisional_learning_adjustment"] = 0.0
         row["learning_adjustment"] = 0.0
+        row["d2tr_market_context_adjustment_raw"] = 0.0
+        row["d2tr_market_context_adjustment_applied"] = 0.0
+        row["total_priority_adjustment"] = 0.0
+        row["d2tr_market_context_evidence"] = {
+            "reason": "INELIGIBLE_CANDIDATE",
+            "matched_dimensions": [],
+        }
         row["selection_priority_score"] = round(float(row.get("score") or 0), 2)
         row["matched_learning_priors"] = []
         row["matched_durable_priors"] = []
@@ -467,10 +663,26 @@ def _apply_learning_priority(
     provisional_adjustment = max(-2.0, min(2.0, provisional_adjustment))
     adjustment = durable_adjustment + provisional_adjustment
     adjustment = max(-MAX_LEARNING_ADJUSTMENT, min(MAX_LEARNING_ADJUSTMENT, adjustment))
+    d2tr_evidence = _d2tr_context_adjustment(row, d2tr_context)
+    d2tr_raw = max(
+        0.0,
+        min(D2TR_MAX_ADJUSTMENT, float(d2tr_evidence.get("raw_adjustment") or 0)),
+    )
+    total_adjustment = max(
+        -MAX_LEARNING_ADJUSTMENT,
+        min(MAX_LEARNING_ADJUSTMENT, adjustment + d2tr_raw),
+    )
+    d2tr_applied = total_adjustment - adjustment
     row["durable_learning_adjustment"] = round(durable_adjustment, 2)
     row["provisional_learning_adjustment"] = round(provisional_adjustment, 2)
     row["learning_adjustment"] = round(adjustment, 2)
-    row["selection_priority_score"] = round(float(row.get("score") or 0) + adjustment, 2)
+    row["d2tr_market_context_adjustment_raw"] = round(d2tr_raw, 2)
+    row["d2tr_market_context_adjustment_applied"] = round(d2tr_applied, 2)
+    row["total_priority_adjustment"] = round(total_adjustment, 2)
+    row["d2tr_market_context_evidence"] = d2tr_evidence
+    row["selection_priority_score"] = round(
+        float(row.get("score") or 0) + total_adjustment, 2
+    )
     row["matched_learning_priors"] = sorted(value for value in matched if value)
     row["matched_durable_priors"] = sorted(
         value for value in matched_durable if value
@@ -606,7 +818,7 @@ def _verified_realtime_signal(
         and observed_in_window
         and primary_source_observed_in_window
         and primary_source_published_in_window
-        and primary_source_status == 200
+        and primary_source_status in {200, 206}
         and primary_source_relation in PRIMARY_SOURCE_RELATIONS
         and isinstance(primary_source_relevance_terms, list)
         and any(str(value).strip() for value in primary_source_relevance_terms)
@@ -1176,6 +1388,7 @@ def select_portfolio(
     source_velocity: Optional[Dict[str, Dict[str, Any]]] = None,
     learning_priors: Optional[Dict[str, Any]] = None,
     provisional_learning_priors: Optional[Dict[str, Any]] = None,
+    d2tr_market_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Evaluate candidates and select a traffic-weighted, capped portfolio."""
 
@@ -1204,7 +1417,13 @@ def select_portfolio(
         provisional_learning_priors
     )
     validated_priors = validated_durable_priors + validated_provisional_priors
-    evaluated = [_apply_learning_priority(row, validated_priors) for row in evaluated]
+    validated_d2tr_context, d2tr_context_status = _validated_d2tr_market_context(
+        d2tr_market_context
+    )
+    evaluated = [
+        _apply_learning_priority(row, validated_priors, validated_d2tr_context)
+        for row in evaluated
+    ]
     eligible = sorted(
         (row for row in evaluated if row["eligible"]),
         key=lambda row: (
@@ -1308,6 +1527,11 @@ def select_portfolio(
             "learning_priors_apply_after_eligibility": True,
             "learning_priors_can_bypass_veto": False,
             "maximum_learning_adjustment": MAX_LEARNING_ADJUSTMENT,
+            "d2tr_applies_after_eligibility": True,
+            "d2tr_can_create_demand": False,
+            "d2tr_can_create_realtime_hot": False,
+            "maximum_d2tr_raw_adjustment": D2TR_MAX_ADJUSTMENT,
+            "maximum_combined_priority_adjustment": MAX_LEARNING_ADJUSTMENT,
         },
         "learning_prior_summary": {
             "status": (
@@ -1342,6 +1566,39 @@ def select_portfolio(
                     else []
                 )
                 - len(validated_provisional_priors),
+            ),
+        },
+        "d2tr_market_context_summary": {
+            "status": d2tr_context_status,
+            "snapshot_fingerprint": (
+                d2tr_market_context.get("snapshot_fingerprint")
+                if isinstance(d2tr_market_context, dict)
+                else None
+            ),
+            "source_snapshot_fingerprint": (
+                d2tr_market_context.get("source_snapshot_fingerprint")
+                if isinstance(d2tr_market_context, dict)
+                else None
+            ),
+            "observed_at": (
+                d2tr_market_context.get("observed_at")
+                if isinstance(d2tr_market_context, dict)
+                else None
+            ),
+            "eligible_candidates_with_adjustment": sum(
+                float(row.get("d2tr_market_context_adjustment_raw") or 0) > 0
+                for row in evaluated
+            ),
+            "matched_markets": sorted(
+                {
+                    str(
+                        (row.get("d2tr_market_context_evidence") or {}).get("market")
+                        or ""
+                    )
+                    for row in evaluated
+                    if float(row.get("d2tr_market_context_adjustment_raw") or 0) > 0
+                }
+                - {""}
             ),
         },
     }
@@ -1572,6 +1829,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "eligible candidates"
         ),
     )
+    score_parser.add_argument(
+        "--d2tr-market-context",
+        type=Path,
+        help=(
+            "Independent d2tr-discover-context-v1 snapshot; may only reorder "
+            "already eligible candidates"
+        ),
+    )
 
     classify_parser = subparsers.add_parser("classify-72h")
     classify_parser.add_argument("--input", required=True, type=Path)
@@ -1657,6 +1922,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if args.provisional_learning_priors is not None
             else None
         )
+        d2tr_market_context = (
+            _load_json(args.d2tr_market_context)
+            if args.d2tr_market_context is not None
+            else None
+        )
         _write_json(
             args.output,
             select_portfolio(
@@ -1668,6 +1938,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 source_velocity,
                 learning_priors,
                 provisional_learning_priors,
+                d2tr_market_context,
             ),
         )
     else:

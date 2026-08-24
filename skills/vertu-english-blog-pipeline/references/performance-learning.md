@@ -130,7 +130,7 @@ If no material and replay-safe change qualifies, preserve the current Skill vers
 
 ## Canonical Base
 
-Use only `VERTU 内容与 SEO 运营闭环`, table `Skill Change Log` (`${FEISHU_SKILL_CHANGE_LOG_TABLE_ID}`).
+Use only `VERTU 内容与 SEO 运营闭环`, table `Skill Change Log` (`${VERTU_SKILL_CHANGE_LOG_TABLE_ID}`).
 
 Record:
 

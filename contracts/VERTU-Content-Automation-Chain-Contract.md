@@ -1,6 +1,6 @@
 # VERTU Content Automation Chain Contract
 
-Updated: 2026-07-29
+Updated: 2026-08-24
 
 ## Objective
 
@@ -44,7 +44,16 @@ Every material decision and external mutation must also retain its domain eviden
 - `vertu-2`: intake `QA Runs`, `Findings 修改建议`, queue states, Draft/rollback/R2 evidence and a repair `发布批次` for every verified republish;
 - `vertu`: `监控运行`, `节点复盘`, `内容复盘`, `修改实验` and local metric/query evidence.
 
-No-op outcomes are still auditable outcomes. `NO_TOPIC`, `NO_PUBLISHED_ARTICLE`, `NO_QUEUED_ITEMS` and `NO_DUE_CHECKPOINT` map to `无可执行项`; `DATA_NOT_MATURE` maps to `数据未成熟`; source failure maps to `来源阻塞`; manual approval/evidence boundaries map to `人工阻塞`. A missing run receipt or missing domain handoff is `HANDOFF_INCOMPLETE`, never silent success.
+Before a protected local pointer, canonical Base, Sanity or Skill-release mutation,
+the executor must also acquire the exact write scopes through
+`vertu-content-loop-runtime-v1`. `ALLOW` is only local collision/budget authority;
+it never replaces the canonical Base start ledger or any traffic, QA, Discover,
+publication or live-verification gate. `PAUSED`, `COLLISION_BLOCKED`,
+`BUDGET_BLOCKED`, `ATTEMPT_LIMIT` and `STATE_INVALID` permit zero requested
+production mutations. Every terminal run must write an owner-checked release receipt;
+`RELEASE_INCOMPLETE` maps to `HANDOFF_INCOMPLETE`.
+
+No-op outcomes are still auditable outcomes. `NO_TOPIC`, `NO_PUBLISHED_ARTICLE`, `NO_QUEUED_ITEMS` and `NO_DUE_CHECKPOINT` map to `无可执行项` except where a named automation profile has a stricter delivery contract. For `vertu-10` v3.13+ the bounded 30/60/90/120 search must either deliver ten fully gated articles or terminate `DAILY_QUOTA_BLOCKED`; quota pressure never lowers a gate. `DATA_NOT_MATURE` maps to `数据未成熟`; source failure maps to `来源阻塞`; manual approval/evidence boundaries map to `人工阻塞`. A missing run receipt, runtime release receipt or domain handoff is `HANDOFF_INCOMPLETE`, never silent success.
 
 If the initial run-ledger write fails, retry at most three times with bounded backoff, write `BASE_AUDIT_WRITE_FAILED` locally and prohibit production publication or repair mutation for that invocation. Always emit a visible Codex receipt and preserve a local `run-summary.json`, including no-op and blocked runs.
 
@@ -52,7 +61,7 @@ If the initial run-ledger write fails, retry at most three times with bounded ba
 
 | Automation | Schedule | Produces | Consumes |
 |---|---|---|---|
-| `vertu-10` | Daily 09:00 Asia/Hong_Kong | New live-verified non-News posts, QA evidence, article assets, monitoring plan, vvv group receipt | Mature monitoring/experiment learnings, GSC baseline, live inventory, product KB |
+| `vertu-10` | Daily 09:00 Asia/Hong_Kong | Ten fully gated live-verified non-News posts or `DAILY_QUOTA_BLOCKED`, QA evidence, article assets, monitoring plan, loop receipts, vvv group receipt | Mature monitoring/experiment learnings, GSC baseline, live inventory, product KB |
 | `vertu-2` | Daily 14:30 Asia/Hong_Kong | Independent live-revision QA, Findings, queue classification, safe repair Drafts, R2 QA, verified republish evidence | New or changed published revisions plus QA Runs where `自动修复发布状态=待执行` |
 | `vertu` | Daily 19:00 Asia/Hong_Kong | Rolling 35-day daily pulse, 24h/72h/7d/28d checkpoints, diagnoses, controlled proposals, experiment verification, portfolio learning | Published and repaired revisions registered in `文章资产` and local `PUBLISHED` handoffs |
 | `vertu-skill` | Twice daily at 10:30 and 21:30 Asia/Hong_Kong | Immutable learning snapshot, expiring provisional priors, durable promotion and Skill release gate, Skill Change Log proposals, replay evidence, rollback state, `NO_PROMOTION` or `NO_SKILL_CHANGE` | Daily pulses, executed mature checkpoints, verified experiments and prior Skill versions |

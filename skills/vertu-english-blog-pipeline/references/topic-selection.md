@@ -1,4 +1,4 @@
-# Topic Selection Contract — Traffic Acquisition v3.11.0
+# Topic Selection Contract — Traffic Acquisition v3.14.0
 
 Topic selection is the highest-leverage stage. The goal is a current or durable reader need where VERTU can add a credible, distinctive perspective and where real performance evidence supports Discover or Search opportunity.
 
@@ -59,7 +59,7 @@ Every candidate must also declare `REALTIME_HOT`, `RISING_SEARCH` or `EVERGREEN_
 
 Separately record `EDITORIAL_BREAKOUT | CURRENT_CONFIRMED | NONE`. A verified editorial breakout can satisfy the current-interest portion of a Discover-first candidate, but it is never a Google demand provider and does not change the candidate's Google trend class.
 
-Do not accept a per-run `topic: 94` or similar final score. Calculate the final value with the reusable deterministic scorer and require `score_source=computed_v3_10_0`; pass the editorial artifacts whenever a breakout is declared. Missing sources remain explicit; missing required evidence rejects or holds the topic. Pass `--learning-priors` for validated durable evidence and `--provisional-learning-priors` for validated unexpired provisional evidence. Preserve the raw computed score separately from `selection_priority_score`; the combined learned adjustment is bounded to `-3..+3` and cannot change eligibility.
+Do not accept a per-run `topic: 94` or similar final score. Calculate the final value with the reusable deterministic scorer and require `score_source=computed_v3_12_0`; pass the editorial artifacts whenever a breakout is declared. Missing sources remain explicit; missing required evidence rejects or holds the topic. Pass `--learning-priors` for validated durable evidence, `--provisional-learning-priors` for validated unexpired provisional evidence and fresh D2TR market context only for post-eligibility ordering. Preserve the raw computed score separately from `selection_priority_score`; durable, provisional and D2TR adjustments share one combined `-3..+3` cap and cannot change eligibility.
 
 ## Traffic-acquisition scoring model
 
@@ -164,9 +164,9 @@ Two providers are independent only when they come from different acquisition evi
 ## Automation behaviour
 
 - Score at least three credible candidates when the source pool permits.
-- For a ten-article batch, score at least 30 candidates when the source pool permits.
+- For a ten-article batch, score at least 30 candidates. The named `vertu-10` profile expands cumulatively to 60, 90 and 120 when required.
 - Select no more than `max_articles`.
-- Prefer `NO_TOPIC` over a weak article.
+- Prefer `NO_TOPIC` over a weak article for ordinary profiles. For `vertu-10`, never weaken the topic gate: seek a distinct direction through bounded expansion, then use `DAILY_QUOTA_BLOCKED` if fewer than ten can qualify.
 - Do not repeat the same entity or intent within seven days unless a material event occurred.
 - Package a material event as one event/opportunity page plus no more than two distinct search-intent support pages. Define query boundaries and publish the event page first.
 - Record rejected candidates so later runs do not rediscover the same weak angle without new evidence.

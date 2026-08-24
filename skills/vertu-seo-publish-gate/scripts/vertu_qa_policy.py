@@ -17,7 +17,7 @@ from typing import Any, Iterable
 
 
 POLICY_ID = "vertu-seo-publish-gate"
-POLICY_VERSION = "0.7.0"
+POLICY_VERSION = "0.7.1"
 DEFAULT_EVALUATION_PROFILE = "official_site_standard"
 
 EVALUATION_PROFILES = {
@@ -49,25 +49,79 @@ HARD_RED_TERMS = {
 }
 
 NON_MEDICAL_CONTEXT_TERMS = {
+    "activity",
+    "background",
+    "benchmark",
     "booking",
+    "bonus",
+    "browser",
+    "card",
     "cabin",
+    "checkout",
+    "compatibility",
+    "contract",
+    "credit",
     "deal",
+    "display",
+    "evidence",
     "fare",
     "flight",
+    "insurance",
     "itinerary",
+    "journey",
+    "lounge",
+    "mileage",
+    "model",
     "offer",
     "payment",
+    "price",
+    "pricing",
+    "refund",
+    "reporting",
+    "research",
+    "retailer",
+    "room",
+    "royalty",
+    "safety",
+    "screen",
+    "screenshot",
+    "seat",
+    "service",
+    "subscription",
     "ticket",
     "transaction",
     "travel",
+    "traveller",
     "upgrade",
+    "visual",
+    "weather",
+    "wealth",
+}
+
+DIAGNOSTIC_NON_MEDICAL_CONTEXT_TERMS = {
+    "battery",
+    "error",
+    "failure",
+    "fault",
+    "hardware",
+    "maintenance",
+    "network",
+    "performance",
+    "problem",
+    "quote",
+    "repair",
+    "security",
+    "service",
+    "software",
+    "system",
+    "technical",
+    "workflow",
 }
 
 MEDICAL_CONTEXT_TERMS = {
     "blood pressure",
     "cancer",
     "clinical",
-    "condition",
     "disease",
     "doctor",
     "fda",
@@ -119,7 +173,7 @@ def _stable_source_label(path: pathlib.Path) -> str:
         "qa-tracking-contract.md": "references/qa-tracking-contract.md",
         "vertu_qa_policy.py": "scripts/vertu_qa_policy.py",
         "vertu_editorial_safeguards.py": "scripts/vertu_editorial_safeguards.py",
-        "VERTU-QA-Handoff-Contract.md": "contracts/VERTU-QA-Handoff-Contract.md",
+        "VERTU-QA-Handoff-Contract.md": "docs/03-运行/VERTU-QA-Handoff-Contract.md",
     }
     return labels.get(path.name, path.name)
 
@@ -192,7 +246,11 @@ def duplicate_qa_run_ids(rows: Iterable[dict[str, Any]]) -> dict[str, list[str]]
 
 
 def _contains_any(text: str, terms: set[str]) -> bool:
-    return any(term in text for term in terms)
+    for term in terms:
+        escaped = re.escape(term).replace(r"\ ", r"\s+")
+        if re.search(rf"(?<!\w){escaped}(?!\w)", text, re.IGNORECASE):
+            return True
+    return False
 
 
 def _local_clause(text: str, start: int, end: int) -> str:
@@ -239,8 +297,13 @@ def classify_restricted_context(text: str, term: str) -> dict[str, Any]:
             classifications.append("NEGATION_OR_DISCLAIMER")
         elif _contains_any(clause, MEDICAL_CONTEXT_TERMS):
             classifications.append("AFFIRMATIVE_MEDICAL_CLAIM")
-        elif lowered_term in {"treat", "treatment"} and _contains_any(
-            clause, NON_MEDICAL_CONTEXT_TERMS
+        elif lowered_term in {"treat", "treatment"} and (
+            _contains_any(clause, NON_MEDICAL_CONTEXT_TERMS)
+            or re.search(r"\btreat\b.{0,160}\bas\b", clause, re.IGNORECASE)
+        ):
+            classifications.append("NON_MEDICAL_CONTEXT")
+        elif lowered_term in {"diagnose", "diagnosis", "diagnostic"} and _contains_any(
+            clause, DIAGNOSTIC_NON_MEDICAL_CONTEXT_TERMS
         ):
             classifications.append("NON_MEDICAL_CONTEXT")
         else:

@@ -8,10 +8,11 @@ tenant identifiers, private run artifacts or machine-specific session state.
 
 ## Included
 
-- canonical editorial Skill v3.11.0 and every active reference;
-- independent SEO QA Skill v0.7.0 and its tracking contract;
+- canonical editorial Skill v3.14.0 and every active reference;
+- independent SEO QA Skill v0.7.1 and its tracking contract;
 - deterministic demand scoring, realtime Trends, monitoring handoff,
-  QA-identity, Skill scorecard and learning-flywheel scripts;
+  QA-identity, daily quota, local loop runtime, Skill scorecard and
+  learning-flywheel scripts;
 - script unit tests;
 - sanitised `vertu-10` automation template;
 - chain, monitoring and vvv receipt contracts;

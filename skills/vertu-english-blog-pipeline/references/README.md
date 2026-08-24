@@ -12,10 +12,11 @@
 - `writing-contract.md` — voice, argument, editorial depth, visible evidence, Discover preview, SEO, links, authorship, and outputs.
 - `author-policy.md` — approved institutional bylines, expertise mapping, rotation and live author-page release checks.
 - `automation-contract.md` — baseline, Discover gate, state machine, approvals, image checks, performance feedback, and delivery safety.
+- `loop-runtime-governance.md` — local multi-loop ownership, mutation-scope leases, budgets, kill switch, release and health audit while canonical Base remains authoritative.
 
 ## Historical/operational references
 
-Retained as historical evidence or narrow operational notes; they do not override the active v3.11.0 contracts:
+Retained as historical evidence or narrow operational notes; they do not override the active v3.14.0 contracts:
 
 - `boss-vs-quickcreator-queries.md`
 - `feishu-image-delivery.md`

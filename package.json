@@ -1,6 +1,6 @@
 {
   "name": "vertu-english-publishing-workflow",
-  "version": "3.11.0",
+  "version": "3.14.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.9.0",

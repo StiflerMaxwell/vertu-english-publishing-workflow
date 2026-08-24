@@ -13,3 +13,7 @@ separate executor to repair a Sanity Draft. It never directly publishes.
 
 Keep these Skills separate. Combining them would allow the writer to define and
 approve its own quality gate.
+
+The producer also consumes `vertu-content-loop-runtime-v1` for local
+coordination. Runtime acquisition never authorises QA or publication; it only
+prevents overlapping writers and unbounded attempts.

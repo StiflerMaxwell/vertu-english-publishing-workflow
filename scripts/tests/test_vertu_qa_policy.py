@@ -13,7 +13,7 @@ SPEC.loader.exec_module(policy)
 
 class QAPolicyTests(unittest.TestCase):
     def test_current_policy_version_includes_editorial_safeguards(self):
-        self.assertEqual(policy.POLICY_VERSION, "0.7.0")
+        self.assertEqual(policy.POLICY_VERSION, "0.7.1")
         self.assertEqual(
             policy._stable_source_label(
                 pathlib.Path("/tmp/vertu_editorial_safeguards.py")
@@ -89,6 +89,36 @@ class QAPolicyTests(unittest.TestCase):
         self.assertEqual(result["classification"], "NON_MEDICAL_CONTEXT")
         self.assertFalse(result["auto_block"])
         self.assertFalse(result["semantic_review_required"])
+
+    def test_fare_conditions_and_upgrade_treatment_are_not_medical(self):
+        result = policy.classify_restricted_context(
+            "Read the fare conditions, including changes, refunds, baggage, seat selection and upgrade treatment.",
+            "treatment",
+        )
+        self.assertEqual(result["classification"], "NON_MEDICAL_CONTEXT")
+        self.assertFalse(result["auto_block"])
+
+    def test_idiomatic_treat_as_is_not_medical(self):
+        result = policy.classify_restricted_context(
+            "Treat the room as part of the display system.", "treat"
+        )
+        self.assertEqual(result["classification"], "NON_MEDICAL_CONTEXT")
+        self.assertFalse(result["semantic_review_required"])
+
+    def test_diagnose_a_failure_is_not_medical(self):
+        result = policy.classify_restricted_context(
+            "Diagnose a failure without authorising a fix.", "diagnose"
+        )
+        self.assertEqual(result["classification"], "NON_MEDICAL_CONTEXT")
+        self.assertFalse(result["auto_block"])
+
+    def test_insurance_policy_treatment_is_not_product_medical_claim(self):
+        result = policy.classify_restricted_context(
+            "Review the insurance wording, including pre-existing-condition treatment and journey limits.",
+            "treatment",
+        )
+        self.assertEqual(result["classification"], "NON_MEDICAL_CONTEXT")
+        self.assertFalse(result["auto_block"])
 
     def test_affirmative_medical_claim_blocks(self):
         result = policy.classify_restricted_context(

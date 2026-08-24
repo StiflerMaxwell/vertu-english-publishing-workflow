@@ -1,4 +1,4 @@
-# Automation Contract — Traffic Acquisition v3.11.0
+# Automation Contract — Traffic Acquisition v3.14.0
 
 This contract makes the pipeline safe for Codex recurring automation and manual runs.
 
@@ -27,9 +27,12 @@ The user granted the recurring automation `vertu-10` standing authority on 14 Ju
 
 Required behaviour:
 
+- before any protected local pointer, canonical Base, Sanity, or Skill release mutation, write a `vertu-content-loop-runtime-v1` manifest and acquire exact write scopes through `scripts/vertu_content_loop_runtime.py`; preserve the acquire/release receipts and keep the Base start ledger independently mandatory;
+- configure positive runtime limits for wall-clock time, child tasks, candidates and attempts per scope; `PAUSED`, `COLLISION_BLOCKED`, `BUDGET_BLOCKED`, `ATTEMPT_LIMIT`, `STATE_INVALID` or `RELEASE_INCOMPLETE` is a blocker and may not be bypassed with a fresh execution ID;
+- set `required_publish_count: 10`, `minimum_articles: 10`, `max_articles: 10`, and cumulative `candidate_expansion_targets: [30, 60, 90, 120]` for this named profile;
 - scope authority to the new run created by `vertu-10`; never reuse it for repairs, historical drafts, another automation or another section;
 - publish only articles individually scoring at least 80 with QA `PASS`, `DISCOVER_READY`, image `PASS`, author preflight `PASS`, live link verification and no veto;
-- require `editorial-intelligence.json`, `source-velocity.json` and `traffic-demand.json` with `score_source=computed_v3_10_0`, passing demand verdict, provider-family qualification, raw source metrics and no validation error; a hand-authored final score is not publication evidence;
+- require `editorial-intelligence.json`, `source-velocity.json` and `traffic-demand.json` with `score_source=computed_v3_12_0`, passing demand verdict, provider-family qualification, raw source metrics and no validation error; a hand-authored final score is not publication evidence;
 - require `geo-audience-baseline.json`, `realtime-trends.json`, `trend-market-map.json` and `hotness-gate.json` before scoring;
 - require the current validated durable `performance-learning-v1` fingerprint and provisional `performance-learning-provisional-v1` fingerprint before scoring, or explicitly record `NO_DURABLE_LESSON`, `NO_PROVISIONAL_LESSON`, `LEARNING_PRIORS_UNAVAILABLE` or `PROVISIONAL_LEARNING_PRIORS_UNAVAILABLE`;
 - classify every serious candidate as `PREMIUM_DECISION_CORE | ADJACENT | EXPLORATION_CANDIDATE`; only a controlled test that passes the normal demand gate becomes `EXPLORATION`. Record mass recognisability, concrete decision intent, historical cluster evidence and niche risk;
@@ -38,7 +41,10 @@ Required behaviour:
 - fetch official Trending Now RSS/CSV/UI evidence when API Alpha is unavailable; never skip all Google Trends collection merely because the API is not configured;
 - prohibit the `REALTIME_HOT` label unless the active scorer receives all three same-run fingerprinted trend artifacts, reconciles the exact query, every non-blank market and all reported metrics to that snapshot, and confirms official market-level evidence plus a current verified primary source;
 - require the latest same-day Hermes RSS and editorial-synthesis outputs before broad candidate creation; an `EDITORIAL_BREAKOUT` must reconcile to `source-velocity.json` and remains distinct from official Google demand evidence;
-- allow fewer than ten articles and `NO_TOPIC`; never publish filler to satisfy volume;
+- require at least ten fully live-verified current-run articles; when the eligible pool is short, expand to the next cumulative candidate target and rerun the unchanged traffic gate;
+- replace an article blocked by drafting, QA, Discover, image, author, publication, live verification or canonical Base handoff with a distinct eligible candidate; never count the blocked article towards the quota;
+- preserve all score, demand, forecast, evidence, diversity, duplicate-intent, non-News, QA, image, author, link, live and Base gates under quota pressure; never publish filler or relabel rejected evidence;
+- after the 120-candidate boundary is exhausted below ten, return `DAILY_QUOTA_BLOCKED` with exact evidence and a source/manual/unexpected terminal mapping; `NO_TOPIC` is not successful completion for `vertu-10`;
 - require independent QA to run the active editorial-safeguards validator over every final article and the complete current batch; duplicate VERTU/Concierge integration or a template-dependent meaningful heading fingerprint is blocking, while `BODY_VISUAL_MISSING` remains warning-only in phase one;
 - keep the permanent automatic `news` and `/news/` veto;
 - query current Sanity schema, slug conflicts, authors and `_rev` values immediately before the mutation;
@@ -54,7 +60,7 @@ Required behaviour:
 
 ```text
 DISCOVERING
-→ SELECTED | NO_TOPIC
+→ SELECTED | EXPAND_REQUIRED | DAILY_QUOTA_BLOCKED
 → RESEARCHING
 → WRITING
 → READY_FOR_QA
@@ -62,12 +68,13 @@ DISCOVERING
 → DISCOVER_FIX | DISCOVER_REJECT | DISCOVER_READY
 → WAITING_FOR_IMAGE | READY_FOR_APPROVAL
 → SANITY_DRAFT
-→ PUBLISHED
+→ PUBLISHED | REPLACEMENT_REQUIRED
+→ QUOTA_COMPLETE
 ```
 
 Write every transition to `handoff.json` with a timestamp.
 
-Read `${VERTU_PDCA_ROOT}/contracts/VERTU-QA-Handoff-Contract.md` before any QA or publication transition. New production runs use `qa-handoff-v1`; independent component version numbers do not need to match, but their compatibility matrix and exact identities must.
+Read `${VERTU_PDCA_ROOT}/docs/03-运行/VERTU-QA-Handoff-Contract.md` before any QA or publication transition. New production runs use `qa-handoff-v1`; independent component version numbers do not need to match, but their compatibility matrix and exact identities must.
 
 ## Handoff shape
 
@@ -86,7 +93,7 @@ Read `${VERTU_PDCA_ROOT}/contracts/VERTU-QA-Handoff-Contract.md` before any QA o
   "qa_handoff_contract_version": "qa-handoff-v1",
   "producer_skill": {
     "id": "vertu-english-blog-pipeline",
-    "version": "3.11.0"
+    "version": "3.14.0"
   },
   "draft_bundle_sha256": null,
   "qa_handoffs": {
@@ -106,6 +113,8 @@ Read `${VERTU_PDCA_ROOT}/contracts/VERTU-QA-Handoff-Contract.md` before any QA o
 
 ## Retry and idempotency
 
+- Reuse the same deterministic local loop execution ID and owned write scopes on retry. Do not invent a new execution to evade a collision, attempt ceiling or budget.
+- Acquire exact mutation scopes before protected writes and release only scopes owned by the exact execution. `RELEASE_INCOMPLETE` is `HANDOFF_INCOMPLETE`.
 - Reuse the same run directory and key on retry.
 - Do not duplicate a run already in `WRITING`, `READY_FOR_QA`, `READY_FOR_APPROVAL`, or `SANITY_DRAFT`.
 - Network fetches may retry three times with bounded backoff.
@@ -160,24 +169,25 @@ The production dataset name does not mean a document is published. Use the curre
 - Build `discover-baseline.json` from finalised 365-day GSC data when available.
 - Build candidate-level traffic demand evidence using `traffic-demand-gate.md`; record unavailable sources instead of fake zeros.
 - Build market-level realtime evidence using `realtime-trends.md`; receipts must separate real-time, rising and evergreen article counts.
-- Score at least 30 candidates for a ten-article run.
-- `max_articles: 10` is a ceiling, not a quota.
+- For the named `vertu-10` profile, score at least 30 candidates and expand cumulatively to 60, 90 and 120 until ten eligible directions are available or bounded supply is exhausted.
+- `required_publish_count: 10` is a hard completion condition for `vertu-10`; the current `max_articles: 10` makes the daily result exactly ten when successful.
 - Use the traffic-weighted soft portfolio contract from `topic-selection.md`; legacy lanes never force filler.
 - When enough candidates independently pass, prefer 50–70% premium/business/collector decision-core topics across at least three distinct clusters, 20–30% adjacent topics and no more than 20% exploration.
 - No more than three adjacent intents or three articles dominated by one entity.
 - Every selected article must independently pass QA and `DISCOVER_READY`.
 - Use at least three relevant author desks in a ten-article portfolio when the selected topics genuinely span their scopes; expertise fit overrides distribution.
-- If only six articles pass, deliver six and report four `NO_TOPIC` slots.
+- If an article fails a downstream gate, retain the failure evidence and select a distinct eligible replacement. If bounded expansion is exhausted below ten, report `DAILY_QUOTA_BLOCKED`; do not claim partial success as quota completion.
 - Never use volume to compensate for weak evidence, thin content, generic imagery, or low audience fit.
 
 ## Suggested Codex automation prompt
 
 ```text
 Run the project skill vertu-english-blog-pipeline in Discover-first auto_discovery mode.
+Before any protected mutation, read loop-runtime-governance.md, acquire exact write scopes with the deterministic loop runtime, enforce runtime/child-task/candidate/attempt limits, and preserve acquire/release receipts. A local ALLOW receipt does not replace the Base start ledger or any editorial/publication gate.
 Read finalised 365-day Google Discover and Search performance before topic selection.
 Before candidate creation, query finalised GSC by country and fetch official Google Trends Trending Now evidence for US, GB, AU, CA, AE, SA, SG, HK and IN. Use the public official fallback when API Alpha is unavailable.
 For every serious candidate, preserve provider-level GSC, Trends/current-interest, Keyword Planner when authorised, SERP, inventory and cluster-support evidence with source status and fetch time. Label it REALTIME_HOT, RISING_SEARCH or EVERGREEN_SEARCH and never call the latter two real-time hot.
-Use a 72-hour current-source window plus durable evergreen demand, score at least 30 candidates, and select up to 10 topics scoring at least 80/100.
+Use a 72-hour current-source window plus durable evergreen demand. For `vertu-10`, require at least 10 fully live-verified articles: score at least 30 candidates and expand the cumulative pool to 60, 90 and 120 when needed. Select only topics scoring at least 80/100 with every normal gate intact, and replace any downstream blocker with a distinct eligible candidate.
 Consume the same-day Hermes RSS and editorial synthesis before broad candidate creation, and preserve editorial-intelligence.json plus source-velocity.json.
 Calculate scores with the deterministic traffic gate; pass the editorial artifacts for breakout candidates plus durable and unexpired provisional learning priors when valid, reject hand-authored final scores, qualify candidate GSC against the latest available finalised-window sample floor, deduplicate demand by acquisition-system family, and require the outcome lane's minimum independent demand signals.
 Use traffic-weighted soft portfolio targets, preserve diversity, and reject abstract B2B, duplicate-intent, thin-update, and generic-visual topics.
@@ -197,7 +207,7 @@ Set cadence, start time, project, notification target, and whether `sanity_draft
 
 ## Monitoring
 
-Report duration by stage, source failures, candidate counts, audience-fit distribution, premium-label/niche-demand vetoes, product-KB revision, QA outcome, image outcome, delivery outcome, unique internal/external destination counts, broken-link count, and rendered-link reconciliation. `NO_TOPIC` is a valid editorial result, not a system failure.
+Report duration by stage, runtime acquire/release decisions, mutation scopes, budgets, attempts, source failures, candidate rounds, replacement reasons, eligible/selected/live counts, audience-fit distribution, premium-label/niche-demand vetoes, product-KB revision, QA outcome, image outcome, delivery outcome, unique internal/external destination counts, broken-link count, and rendered-link reconciliation. `NO_TOPIC` remains valid for profiles whose minimum is zero; it is not successful completion for `vertu-10`, where exhausted supply below ten is `DAILY_QUOTA_BLOCKED`.
 
 For published content, use one daily monitor that scans the rolling 35-day `PUBLISHED` cohort on every invocation. Always write a daily pulse, then execute any due milestone checkpoints. Schedule read-only measurements at daily, 24 hours, 72 hours, 7 days, and 28 days:
 
@@ -207,8 +217,8 @@ For published content, use one daily monitor that scans the rolling 35-day `PUBL
 - `7d`: one evidence-backed optimisation proposal at most;
 - `28d`: mature classification, cannibalisation, experiment verification, and portfolio learning.
 
-Use `${VERTU_PDCA_ROOT}/contracts/VERTU-Content-Performance-Monitoring-Contract.md` when available. Missing or delayed data is `DATA_NOT_MATURE`, never zero. The monitor may create a mutation preview but may not mutate Sanity without article-specific approval and a fresh `_rev`. Feed mature results into future baselines without overwriting historical runs.
+Use `${VERTU_PDCA_ROOT}/docs/03-运行/VERTU-Content-Performance-Monitoring-Contract.md` when available. Missing or delayed data is `DATA_NOT_MATURE`, never zero. The monitor may create a mutation preview but may not mutate Sanity without article-specific approval and a fresh `_rev`. Feed mature results into future baselines without overwriting historical runs.
 
 A mature 72-hour page that passes the Search or Discover sample gate must receive a concrete CTR, coverage, packaging, intent, promising, or winner-watch diagnosis. It must not remain generic `INSUFFICIENT_DATA`. Generate at most one major-variable proposal at 7 days and promote only verified 28-day experiment outcomes to durable topic priors.
 
-Run a separate learning and Skill release automation twice daily after the corresponding monitor pulse. It reads daily pulses plus the full executed checkpoint history, writes immutable `learning-snapshot.json`, rejects placeholders/immature/blocked inputs, records proposals and expiries in `Skill Change Log`, writes `provisional-performance-priors.json` from recent repeated 72h/7d evidence, and updates `active-performance-priors.json` only for replay-validated durable priors. Same-day spikes are observations or manual experiment candidates, never durable priors. Every material Skill or governing-process proposal must also produce a fingerprinted `skill-scorecard.json`: absolute structural scores are diagnostic only, paired before/after review controls keep/revert, replay is a hard gate and traffic-affecting promotion requires mature production evidence. Apply only material, tested non-structural changes automatically, keep structural changes and low-risk experiments approval-gated, and record `NO_PROMOTION` and `NO_SKILL_CHANGE` without a version bump when nothing qualifies.
+Run a separate learning and Skill release automation twice daily after the corresponding monitor pulse. First run the read-only loop audit and preserve `loop-health.json`; expired claims, orphan locks, malformed locks or running executions with missing claims remain a visible `DEGRADED` state. The learning job reads daily pulses plus the full executed checkpoint history, writes immutable `learning-snapshot.json`, rejects placeholders/immature/blocked inputs, records proposals and expiries in `Skill Change Log`, writes `provisional-performance-priors.json` from recent repeated 72h/7d evidence, and updates `active-performance-priors.json` only for replay-validated durable priors. Same-day spikes are observations or manual experiment candidates, never durable priors. Every material Skill or governing-process proposal must also produce a fingerprinted `skill-scorecard.json`: absolute structural scores are diagnostic only, paired before/after review controls keep/revert, replay is a hard gate and traffic-affecting promotion requires mature production evidence. Apply only material, tested non-structural changes automatically, keep structural changes and low-risk experiments approval-gated, and record `NO_PROMOTION` and `NO_SKILL_CHANGE` without a version bump when nothing qualifies.

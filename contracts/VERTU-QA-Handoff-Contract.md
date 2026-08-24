@@ -16,7 +16,7 @@ This is the shared source of truth between the VERTU English producer, the indep
 
 Component versions are intentionally independent. Matching version numbers are not required; a compatible handoff contract and exact policy identity are required.
 
-Current verified pair after the 2026-08-05 stability release: producer `3.11.0`, QA `0.7.0`, handoff `qa-handoff-v1`. Older versions inside the compatible ranges remain valid only for their exact historical policy and source identity.
+Current verified pair after the 2026-08-24 runtime-governance release: producer `3.14.0`, QA `0.7.1`, handoff `qa-handoff-v1`. Older versions inside the compatible ranges remain valid only for their exact historical policy and source identity.
 
 ## Required identity
 

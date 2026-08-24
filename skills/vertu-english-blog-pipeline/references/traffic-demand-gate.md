@@ -1,4 +1,4 @@
-# Traffic Demand Gate — v3.11.0
+# Traffic Demand Gate — v3.14.0
 
 Use this contract before selecting or drafting an article. Its purpose is to prove that a candidate has a plausible Search or Discover acquisition path. It does not promise ranking or recommendation.
 
@@ -14,6 +14,7 @@ Every serious candidate must record:
 - one trend class from `REALTIME_HOT | RISING_SEARCH | EVERGREEN_SEARCH`, target markets and the evidence required by `realtime-trends.md`.
 - one separate editorial signal from `EDITORIAL_BREAKOUT | CURRENT_CONFIRMED | NONE`, with the evidence required by `editorial-intelligence.md`.
 - one audience-fit lane from `PREMIUM_DECISION_CORE | ADJACENT | EXPLORATION_CANDIDATE`; promote `EXPLORATION_CANDIDATE` to `EXPLORATION` only after the normal demand gate passes. Record mass recognisability, concrete decision intent, finalised historical cluster evidence and niche risk.
+- optional `d2tr_context` with an exact market and explicit topic-category, editorial-format-group, format-type or content-category mapping. This independent context is never a Search-demand provider and never creates a Google trend class.
 
 Allowed source states are `AVAILABLE` and `SOURCE_UNAVAILABLE`. An unavailable source requires a reason and fetch time. Never replace an unavailable metric with zero.
 
@@ -55,13 +56,19 @@ python3 ${VERTU_PDCA_ROOT}/scripts/vertu_content_traffic_gate.py score \
 
 Selection requires computed score at least 80, `STRONG` or approved `TEST` demand verdict, no validation error, and no veto. A per-run script must never supply the final score.
 
-The active scorer emits `score_source=computed_v3_10_0`, `positive_demand_provider_families`, `demand_signal_qualifications` and one selected market-demand score per qualified family. Preserve these fields in `traffic-demand.json`; provider labels alone are not evidence of independence.
+The active scorer emits `score_source=computed_v3_12_0`, `positive_demand_provider_families`, `demand_signal_qualifications` and one selected market-demand score per qualified family. Preserve these fields in `traffic-demand.json`; provider labels alone are not evidence of independence.
 
 For historical VERTU/GSC fit, reward the exact or adjacent reader cluster and decision pattern, not the presence of premium vocabulary. Evidence that commercial-airline cabin decisions performed well does not automatically support private aviation, generic hotels, yachts or all luxury travel. Preserve the narrowest supported boundary.
 
 Historical cluster adjacency and candidate-level GSC demand are different fields. Cluster adjacency can score historical fit. It counts as a positive demand provider only when finalised GSC query/page evidence maps to the candidate's same normalised query and intent. Score a piece of evidence once and never add points for the audience-fit lane itself.
 
-When a validated durable `performance-learning-v1` artifact exists, pass it with `--learning-priors`. When a validated, unexpired `performance-learning-provisional-v1` artifact exists, pass it with `--provisional-learning-priors`. The scorer first calculates normal eligibility, then applies both layers with one combined `-3..+3` cap to `selection_priority_score` for portfolio ordering. A 72-hour provisional prior may contribute at most one point and a 7-day provisional prior at most two. The raw score, demand verdict and vetoes remain unchanged. Missing, expired or invalid learning evidence is not a scoring failure; record it and continue without the affected layer.
+When a validated durable `performance-learning-v1` artifact exists, pass it with `--learning-priors`. When a validated, unexpired `performance-learning-provisional-v1` artifact exists, pass it with `--provisional-learning-priors`. When a valid `d2tr-discover-context-v1` artifact observed within eight hours exists, pass it with `--d2tr-market-context`. The scorer first calculates normal eligibility, then applies all ordering layers with one combined `-3..+3` cap to `selection_priority_score`. A 72-hour provisional prior may contribute at most one point, a 7-day provisional prior at most two, and exact D2TR market-context matches at most two. The raw score, demand verdict, Google trend class and vetoes remain unchanged. Missing, blocked, stale or unmatched D2TR context yields zero adjustment and never a penalty.
+
+### Independent D2TR market context
+
+Collect D2TR's public Discover volatility, format-group volatility, topic volatility, format interest and category heatmap three times daily at `00:00`, `08:00` and `16:00` Asia/Hong_Kong. Preserve each immutable snapshot and its fingerprint in the canonical Base `Discover 趋势快照` table and locally under `output/vertu-signals/trend-monitor/`. Delete only dedicated snapshot rows and local snapshot directories older than 30 rolling days; retain automation-ledger and monitoring receipts.
+
+D2TR is an independent source and explicitly not official Google data. It may strengthen portfolio ordering only after a candidate already has score `>=80`, a passing demand verdict, no veto and a passing pre-draft Discover forecast. Award at most `+2` for a multi-dimensional breakout and at most `+1` for one strong or two moderate exact context matches. Require fresh source-generation timestamps and explicit candidate mappings. D2TR cannot create a demand provider, `RISING_SEARCH`, `REALTIME_HOT`, eligibility or veto relief.
 
 ## Source usage
 
@@ -95,7 +102,7 @@ Use these soft targets after every candidate independently passes:
 - about 30% rising current interest;
 - up to 20% controlled exploration or VERTU authority.
 
-Keep no more than three articles dominated by one entity, reject duplicate intent, preserve meaningful topic diversity, and keep automatic content out of `news` and `/news/`. `max_articles` is a ceiling. Report `NO_TOPIC` slots when the evidence does not support the full maximum.
+Keep no more than three articles dominated by one entity, reject duplicate intent, preserve meaningful topic diversity, and keep automatic content out of `news` and `/news/`. `max_articles` is normally a ceiling. The named `vertu-10` profile is the explicit exception: it expands the candidate pool and replaces downstream blockers until ten articles pass, while this traffic gate remains unchanged. If bounded supply is exhausted below ten, report `DAILY_QUOTA_BLOCKED`; never manufacture eligibility or `NO_TOPIC` success.
 
 When enough candidates independently pass, prefer roughly 50–70% `PREMIUM_DECISION_CORE` across at least three distinct clusters, 20–30% `ADJACENT`, and no more than 20% `EXPLORATION`. This preference is applied after normal eligibility and before final portfolio ordering; it never creates a score adjustment.
 

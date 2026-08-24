@@ -3,6 +3,7 @@ import json
 import pathlib
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 
 
 MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "vertu_content_learning_flywheel.py"
@@ -241,7 +242,9 @@ class LearningFlywheelTests(unittest.TestCase):
             for index, run_id in enumerate(("run-a", "run-a", "run-b"), start=1):
                 slug = f"article-{index}"
                 row = checkpoint(slug, checkpoint_name="72h")
-                row["executed_at_utc"] = "2026-07-29T00:00:00Z"
+                row["executed_at_utc"] = (
+                    datetime.now(timezone.utc) - timedelta(days=1)
+                ).isoformat().replace("+00:00", "Z")
                 write_json(
                     root / run_id / "performance" / slug / "72h-result.json",
                     row,
@@ -288,7 +291,9 @@ class LearningFlywheelTests(unittest.TestCase):
             for index, run_id in enumerate(("run-a", "run-b"), start=1):
                 slug = f"article-{index}"
                 row = checkpoint(slug, checkpoint_name="7d")
-                row["executed_at_utc"] = "2026-07-29T00:00:00Z"
+                row["executed_at_utc"] = (
+                    datetime.now(timezone.utc) - timedelta(days=1)
+                ).isoformat().replace("+00:00", "Z")
                 write_json(
                     root / run_id / "performance" / slug / "7d-result.json",
                     row,
