@@ -23,7 +23,7 @@ Each mutation scope has one owner at a time.
 | Monitor | Monitoring-run and checkpoint rows | Sanity content mutation, experiment approval |
 | Repair | One queued existing document and its repair execution row | A document currently claimed by producer or another repair |
 | Trend | Fingerprinted trend snapshots and active pointer | Search-demand verdicts, article mutation |
-| Learning/release | Governed prior pointers and Skill Change Log | Article mutation, veto waiver, demand creation |
+| Learning/release | Governed prior pointers and `Skill 学习与进化` change summaries | Article mutation, veto waiver, demand creation |
 
 Use stable scopes such as:
 
@@ -68,7 +68,7 @@ Every loop declares positive limits and current non-negative usage for:
 - `max_candidates`;
 - `max_attempts_per_scope`.
 
-The named `vertu-10` producer keeps the approved 120-candidate editorial boundary. The runtime budget may stop repeated or concurrent work, but it may not lower the article score threshold, change demand evidence, waive a veto, bypass QA, count an incomplete handoff or redefine daily quota success.
+The named `vertu-10` producer keeps two independently fingerprinted 120-candidate editorial boundaries: `HOT_PRIMARY` and `EVERGREEN_FALLBACK`, with `max_candidates=240` cumulative under the same execution. Each phase remains bounded at 120. The runtime budget may stop repeated or concurrent work, but it may not lower the article score threshold, change demand evidence, waive a veto, bypass QA, count an incomplete handoff or redefine daily quota success.
 
 When a limit is reached:
 

@@ -14,7 +14,8 @@ easier to operate are welcome.
 5. Run the checks below.
 
 ```bash
-python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+python3 -m pip install -r requirements-dev.txt
+python3 -m pytest scripts/tests skills/vertu-seo-publish-gate/tests --import-mode=importlib
 python3 scripts/validate_bundle.py
 git diff --check
 ```

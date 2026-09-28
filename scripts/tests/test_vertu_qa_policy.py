@@ -2,6 +2,7 @@ import importlib.util
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
 
 MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "vertu_qa_policy.py"
@@ -13,7 +14,7 @@ SPEC.loader.exec_module(policy)
 
 class QAPolicyTests(unittest.TestCase):
     def test_current_policy_version_includes_editorial_safeguards(self):
-        self.assertEqual(policy.POLICY_VERSION, "0.7.1")
+        self.assertEqual(policy.POLICY_VERSION, "0.8.0")
         self.assertEqual(
             policy._stable_source_label(
                 pathlib.Path("/tmp/vertu_editorial_safeguards.py")
@@ -26,6 +27,21 @@ class QAPolicyTests(unittest.TestCase):
             policy.normalise_policy_version("vertu-seo-publish-gate-0.4.0"),
             "0.4.0",
         )
+
+    def test_current_identity_rejects_declared_version_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            skill = pathlib.Path(directory) / "SKILL.md"
+            skill.write_text("Current policy version: `0.7.1`.")
+            with mock.patch.object(policy, "canonical_policy_sources", return_value=(skill,)):
+                with self.assertRaisesRegex(policy.QAPolicyError, "QA_POLICY_VERSION_MISMATCH"):
+                    policy.current_policy_identity()
+
+    def test_runtime_executes_safeguards_without_article_release_authority(self):
+        result = policy.check_runtime()
+        self.assertTrue(result["startup_compatible"])
+        self.assertEqual(len(result["checks"]), 8)
+        self.assertTrue(all(result["checks"].values()))
+        self.assertFalse(result["authorises_release"])
 
     def test_identity_is_deterministic_and_profile_sensitive(self):
         first = policy.build_qa_identity(

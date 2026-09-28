@@ -1,10 +1,10 @@
-# Skill Evolution Scorecard
+# Skill Evolution Scorecard — v2
 
 Use this contract for every proposed change to the VERTU English publishing Skill or its governing process. It adapts paired before/after evaluation to VERTU's real objective: qualified Search and Discover traffic with reliable production delivery.
 
 ## Boundary
 
-The scorecard evaluates a Skill change. It does not score article candidates and does not replace `vertu_content_traffic_gate.py`.
+The scorecard evaluates a Skill change. It does not score article candidates and does not replace `vertu_content_traffic_gate.py`. Read `skill-evolution-factor-vector.md` first: its 60 rows preserve granular observations and its exact-vector evaluator judges the predeclared hypothesis before this scorecard applies release gates.
 
 Never let the scorecard:
 
@@ -17,6 +17,8 @@ Never let the scorecard:
 ## Three independent layers
 
 Do not combine the layers into one total.
+
+Do not sum the 60 Skill-evolution factors either. A proposed change must predeclare target and guardrail factors and produce `skill-evolution-factor-evaluation-v1`. Only `PROMOTION_CANDIDATE` may continue through the layers below. `REVERT_REQUIRED`, `SOURCE_BLOCKED`, `CONTINUE_OBSERVING`, `NO_EFFECT` and `EXPERIMENT_REQUIRED` map to explicit non-positive release states without becoming another aggregate score.
 
 ### 1. Structural diagnostic — triage only
 
@@ -84,7 +86,7 @@ Any hard-gate regression overrides all scores and returns `REVERT_REQUIRED`.
 
 ## Deterministic runtime
 
-Build one input manifest using contract `skill-evolution-scorecard-input-v1`, then run:
+Build one input manifest using contract `skill-evolution-scorecard-input-v2`. Its `factor_evaluation` object must contain the immutable evaluation path and exact evaluation fingerprint. Then run:
 
 ```bash
 python3 scripts/vertu_skill_evolution_scorecard.py \
@@ -93,26 +95,27 @@ python3 scripts/vertu_skill_evolution_scorecard.py \
   --observed-at <iso-8601-time>
 ```
 
-The output contract is `skill-evolution-scorecard-v1`. Preserve its input and scorecard fingerprints. Do not edit a generated scorecard by hand.
+The output contract is `skill-evolution-scorecard-v2`. Preserve its input, factor-evaluation and scorecard fingerprints. Do not edit a generated scorecard by hand. Historical v1 scorecards remain immutable evidence but cannot authorise a new v2 change.
 
 ## Release decisions
 
-- `REJECTED`: structural diagnostic failed.
-- `REVERT_REQUIRED`: before version won, replay failed/regressed or mature production outcome failed.
-- `MANUAL_REVIEW`: comparison, replay or production result is inconclusive.
-- `PENDING_MATURITY`: early evidence exists but durable evidence does not.
+- `REJECTED`: structural diagnostic failed, or mature target factors showed no effect before production activation.
+- `REVERT_REQUIRED`: a factor guardrail breached, an active production change showed no effect, the before version won, replay failed/regressed or mature production outcome failed.
+- `MANUAL_REVIEW`: the factor evaluator requires an experiment, or comparison/replay/production is inconclusive.
+- `PENDING_MATURITY`: selected factor sources are blocked or evidence is not mature.
 - `PROMOTION_ELIGIBLE`: all required gates passed; activation authority remains separate.
 - `IMPLEMENTED_BY_APPROVAL`: explicit governance-only bootstrap, with tests and replay, that does not alter traffic decisions.
 
 ## Feishu audit
 
-Use only canonical Base `VERTU 内容与 SEO 运营闭环`, table `Skill Change Log` (`${VERTU_SKILL_CHANGE_LOG_TABLE_ID}`). Search exact `Change ID` first.
+Use only canonical Base `VERTU SEO 全流程治理与 Skill 自进化`, table `Skill 学习与进化` (`CONFIGURE_TBL`, formerly `Skill Change Log`). Search exact `Change ID` first.
 
 Record:
 
 - Change ID, execution ID and change class;
 - diagnostic score, paired verdict, production outcome score and release decision;
 - scorecard fingerprint, evidence paths and sample size;
+- factor-vector and factor-evaluation fingerprints, exact evaluation decision/path, target/guardrail factor IDs and maturity state;
 - old/new rule, replay result and rollback condition;
 - Skill version, lifecycle state and implementation/expiry time.
 

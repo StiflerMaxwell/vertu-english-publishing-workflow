@@ -68,7 +68,7 @@ Use when GSC and/or Keyword Planner support durable demand without a current sur
 - Search-first still requires two independent positive demand providers.
 - Discover-first still requires current interest, historical audience support and a concrete visual story.
 
-Use `scripts/vertu_content_traffic_gate.py --trend-mode realtime_hot` when the requested portfolio prioritises current traffic. This mode front-loads verified real-time and rising candidates but never lowers the score threshold or fills weak slots.
+Use `scripts/vertu_content_traffic_gate.py --trend-mode realtime_hot` when the requested portfolio prioritises current traffic. This mode front-loads verified real-time and rising candidates but never lowers the score threshold or fills weak slots. Under `vertu-10`, insufficient bounded current-interest supply starts `EVERGREEN_FALLBACK`; absence of `REALTIME_HOT` evidence must not stop qualifying evergreen publication or cause evergreen content to be mislabelled as hot.
 
 ## Required artifacts and receipt
 

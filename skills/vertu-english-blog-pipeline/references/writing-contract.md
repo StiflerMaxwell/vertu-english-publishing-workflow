@@ -60,6 +60,8 @@ Every draft must define:
 5. one legitimate VERTU perspective;
 6. one conclusion earned by evidence.
 
+For production-selected work, the argument must also implement the exact `serp-benchmark-v1` fingerprint and original-value delta in `content-differentiation-brief.md`. Ranking-page structure establishes reader expectations; it is not copy material. If the benchmark requires a decision matrix, market comparison, timeline, calculation or checklist, that object must appear substantively in the final article.
+
 Major-section order should matter. If sections can be shuffled without changing the argument, strengthen the through-line or make the article an explicit list.
 
 ## Structure patterns
@@ -103,6 +105,7 @@ Do not force a scenario opener when a direct answer serves better.
 - Reader-useful authoritative PDFs count as evidence. Image assets, author links, self-links, schema-only URLs, and duplicated destinations do not.
 - Fewer than three external sources is allowed only when the supported facts and original synthesis justify an explicit article-specific editorial exception; never add decorative links to satisfy a number.
 - Reconcile the final article body against `evidence-pack.md` and `link-plan.json` before delivery so approved sources are not lost during Markdown/HTML/Sanity conversion.
+- Reconcile the final article body against `serp-benchmark.json` and `content-differentiation-brief.md`; missing or generic implementation of the declared original value is a required QA fix.
 
 ## Product integration
 

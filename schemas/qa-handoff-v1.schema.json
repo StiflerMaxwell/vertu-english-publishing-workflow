@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vertu.com/schemas/qa-handoff-v1.schema.json",
+  "title": "VERTU Production and Independent QA Handoff v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "publication_run_id",
+    "article_key",
+    "canonical_url",
+    "section",
+    "language",
+    "markets",
+    "producer_skill",
+    "source_identity",
+    "release_gate_role",
+    "qa"
+  ],
+  "properties": {
+    "contract_version": {"const": "qa-handoff-v1"},
+    "publication_run_id": {"type": "string", "minLength": 1},
+    "article_key": {"type": "string", "minLength": 1},
+    "canonical_url": {"type": "string", "minLength": 1},
+    "section": {"type": "string", "minLength": 1},
+    "language": {"type": "string", "minLength": 1},
+    "markets": {"type": "array", "items": {"type": "string", "minLength": 2}, "minItems": 1, "uniqueItems": true},
+    "producer_skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"const": "vertu-english-blog-pipeline"},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "source_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "draft_bundle_sha256"],
+      "properties": {
+        "type": {"enum": ["artifact_bundle", "sanity_draft_revision", "published_revision"]},
+        "draft_bundle_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "sanity_doc_id": {"type": ["string", "null"]},
+        "source_rev": {"type": ["string", "null"]}
+      }
+    },
+    "release_gate_role": {"enum": ["preflight", "prepublish", "postpublish_audit"]},
+    "qa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "record_id", "policy_id", "policy_version", "policy_hash", "evaluation_profile", "verdict", "patch_action", "unresolved_critical", "unresolved_required"],
+      "properties": {
+        "run_id": {"type": "string", "minLength": 1},
+        "record_id": {"type": "string", "minLength": 1},
+        "policy_id": {"const": "vertu-seo-publish-gate"},
+        "policy_version": {"type": "string", "minLength": 1},
+        "policy_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "evaluation_profile": {"enum": ["official_site_relaxed", "official_site_standard", "official_site_strict"]},
+        "verdict": {"enum": ["PASS", "FIX", "BLOCK"]},
+        "score": {"type": ["number", "null"]},
+        "patch_action": {"type": "string", "minLength": 1},
+        "critical_veto": {"type": ["string", "boolean", "null"]},
+        "unresolved_critical": {"type": "integer", "minimum": 0},
+        "unresolved_required": {"type": "integer", "minimum": 0}
+      }
+    },
+    "compatibility_status": {"enum": ["COMPATIBLE", "LEGACY_UNVERIFIED", "VERSION_MISMATCH", "ARTIFACT_MISMATCH", "REVISION_MISMATCH", "TRACKING_INCOMPLETE"]},
+    "qa_result_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}
+

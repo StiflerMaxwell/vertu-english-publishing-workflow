@@ -23,7 +23,7 @@ from typing import Any, Iterable, Sequence
 
 
 QA_HANDOFF_CONTRACT_VERSION = "qa-handoff-v1"
-SAFEGUARD_SCHEMA_VERSION = "editorial-safeguards-v1"
+SAFEGUARD_SCHEMA_VERSION = "editorial-safeguards-v2"
 DEFAULT_TEMPLATE_SIMILARITY_THRESHOLD = 0.78
 DEFAULT_MIN_COMPARABLE_HEADINGS = 5
 DEFAULT_MIN_SHARED_HEADINGS = 5
@@ -96,6 +96,47 @@ GENERIC_IMAGE_ALTS = {
     "image",
     "luxury background",
     "placeholder",
+}
+
+SERP_BENCHMARK_CONTRACT_VERSION = "serp-benchmark-v1"
+VALUE_OBJECT_PATTERNS = {
+    "table": (
+        re.compile(r"(?m)^\s*\|.+\|\s*$"),
+        re.compile(r"<table\b", re.IGNORECASE),
+        re.compile(r"\b(?:decision|comparison) matrix\b", re.IGNORECASE),
+    ),
+    "timeline": (re.compile(r"\btimeline\b", re.IGNORECASE),),
+    "checklist": (
+        re.compile(r"\bchecklist\b", re.IGNORECASE),
+        re.compile(r"(?m)^\s*[-*]\s+\[[ xX]\]"),
+        re.compile(r"\bdecision tree\b", re.IGNORECASE),
+    ),
+    "calculation": (
+        re.compile(r"\b(?:cost|scenario) calculation\b", re.IGNORECASE),
+        re.compile(r"\btotal cost\b", re.IGNORECASE),
+        re.compile(r"\bworked scenario\b", re.IGNORECASE),
+    ),
+    "market_comparison": (
+        re.compile(r"\bmarket[- ]by[- ]market\b", re.IGNORECASE),
+        re.compile(r"\bcountry[- ]by[- ]country\b", re.IGNORECASE),
+        re.compile(r"\bmarket comparison\b", re.IGNORECASE),
+    ),
+    "risk_analysis": (
+        re.compile(r"\brisk(?:s| analysis| matrix)?\b", re.IGNORECASE),
+        re.compile(r"\btrade[- ]offs?\b", re.IGNORECASE),
+    ),
+    "primary_evidence_synthesis": (
+        re.compile(r"\bprimary (?:source|evidence)\b", re.IGNORECASE),
+        re.compile(r"\bverified (?:evidence|data|sources?)\b", re.IGNORECASE),
+        re.compile(r"\bmethodology\b", re.IGNORECASE),
+    ),
+}
+
+DELTA_STOPWORDS = {
+    "about", "after", "again", "against", "article", "between", "comparing",
+    "comparison", "could", "decision", "from", "have", "into", "market",
+    "matrix", "more", "other", "reader", "their", "these", "this", "those",
+    "through", "using", "verified", "which", "with",
 }
 
 
@@ -597,16 +638,112 @@ def body_visual_evaluation(
     }
 
 
+def _benchmark_fingerprint(payload: dict[str, Any]) -> str:
+    material = {
+        key: value for key, value in payload.items() if key != "benchmark_fingerprint"
+    }
+    encoded = json.dumps(
+        material, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def serp_differentiation_evaluation(
+    content: str,
+    *,
+    benchmark: dict[str, Any] | None,
+    required: bool,
+) -> dict[str, Any]:
+    """Verify the producer benchmark identity and visible value implementation."""
+
+    if not required and benchmark is None:
+        return {
+            "code": "SERP_DIFFERENTIATION_MISMATCH",
+            "applicable": False,
+            "status": "NOT_APPLICABLE",
+            "blocking": False,
+            "finding": None,
+        }
+
+    issues: list[str] = []
+    if not isinstance(benchmark, dict):
+        issues.append("serp-benchmark.json is missing or invalid")
+        benchmark = {}
+    if benchmark.get("contract_version") != SERP_BENCHMARK_CONTRACT_VERSION:
+        issues.append("SERP benchmark contract is not serp-benchmark-v1")
+    if benchmark.get("verdict") != "BENCHMARK_PASS":
+        issues.append("SERP benchmark verdict is not BENCHMARK_PASS")
+    declared_fingerprint = benchmark.get("benchmark_fingerprint")
+    computed_fingerprint = _benchmark_fingerprint(benchmark) if benchmark else None
+    if not declared_fingerprint or declared_fingerprint != computed_fingerprint:
+        issues.append("SERP benchmark fingerprint mismatch")
+
+    delta = str(benchmark.get("original_value_delta") or "").strip()
+    if not delta:
+        issues.append("original-value delta is missing")
+    required_types = [
+        value
+        for value in benchmark.get("required_value_object_types") or []
+        if value in VALUE_OBJECT_PATTERNS
+    ]
+    matched_types = [
+        value
+        for value in required_types
+        if any(pattern.search(content) for pattern in VALUE_OBJECT_PATTERNS[value])
+    ]
+    if required_types and not matched_types:
+        issues.append("no declared article-specific value object is visible in the final body")
+
+    delta_terms = {
+        token
+        for token in re.findall(r"[a-z][a-z0-9-]{4,}", delta.casefold())
+        if token not in DELTA_STOPWORDS
+    }
+    content_terms = set(re.findall(r"[a-z][a-z0-9-]{4,}", content.casefold()))
+    matched_terms = sorted(delta_terms & content_terms)
+    minimum_term_matches = min(2, len(delta_terms)) if delta_terms else 0
+    if minimum_term_matches and len(matched_terms) < minimum_term_matches:
+        issues.append("final body does not substantively reflect the declared original-value delta")
+
+    finding = None
+    if issues:
+        finding = {
+            "code": "SERP_DIFFERENTIATION_MISMATCH",
+            "severity": "required",
+            "blocking": True,
+            "decision_impact": "FIX",
+            "evidence_label": "Measured",
+            "location": "SERP benchmark bundle and final article body",
+            "message": "; ".join(issues),
+            "benchmark_fingerprint": declared_fingerprint,
+        }
+    return {
+        "code": "SERP_DIFFERENTIATION_MISMATCH",
+        "applicable": True,
+        "status": "MISMATCH" if issues else "PASS",
+        "blocking": bool(issues),
+        "benchmark_fingerprint": declared_fingerprint,
+        "computed_benchmark_fingerprint": computed_fingerprint,
+        "required_value_object_types": required_types,
+        "matched_value_object_types": matched_types,
+        "matched_delta_terms": matched_terms,
+        "finding": finding,
+    }
+
+
 def _summarise_article(
     *,
     article_key: str,
     duplicate: dict[str, Any],
     visual: dict[str, Any],
     fingerprint: dict[str, Any],
+    serp_differentiation: dict[str, Any] | None = None,
     additional_findings: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     findings = [finding for finding in (duplicate.get("finding"),) if finding]
     findings.extend(additional_findings)
+    if serp_differentiation and serp_differentiation.get("finding"):
+        findings.append(serp_differentiation["finding"])
     warnings = [warning for warning in (visual.get("warning"),) if warning]
     required_count = sum(
         1
@@ -638,6 +775,7 @@ def _summarise_article(
         "duplicate_integration": duplicate,
         "body_visual": visual,
         "heading_fingerprint": fingerprint,
+        "serp_differentiation": serp_differentiation,
     }
 
 
@@ -650,6 +788,8 @@ def evaluate_article(
     entity_terms: Sequence[str] = (),
     visual_exception: str | None = None,
     word_threshold: int = DEFAULT_LONG_FORM_WORD_THRESHOLD,
+    serp_benchmark: dict[str, Any] | None = None,
+    require_serp_benchmark: bool = False,
 ) -> dict[str, Any]:
     article_key = _require_text(article_key, "article_key")
     effective_entity_terms = list(
@@ -673,11 +813,17 @@ def evaluate_article(
         word_threshold=word_threshold,
     )
     fingerprint = heading_fingerprint(content, entity_terms=effective_entity_terms)
+    serp_differentiation = serp_differentiation_evaluation(
+        content,
+        benchmark=serp_benchmark,
+        required=require_serp_benchmark,
+    )
     return _summarise_article(
         article_key=article_key,
         duplicate=duplicate,
         visual=visual,
         fingerprint=fingerprint,
+        serp_differentiation=serp_differentiation,
     )
 
 
@@ -714,6 +860,8 @@ def evaluate_batch(
             entity_terms=article.get("entity_terms") or (),
             visual_exception=article.get("visual_exception"),
             word_threshold=word_threshold,
+            serp_benchmark=article.get("serp_benchmark"),
+            require_serp_benchmark=bool(article.get("require_serp_benchmark")),
         )
         base_results[article_key] = result
         fingerprints[article_key] = result["heading_fingerprint"]
@@ -777,6 +925,7 @@ def evaluate_batch(
                 duplicate=base["duplicate_integration"],
                 visual=base["body_visual"],
                 fingerprint=base["heading_fingerprint"],
+                serp_differentiation=base.get("serp_differentiation"),
                 additional_findings=template_findings,
             )
         )
@@ -834,6 +983,18 @@ def _load_manifest_articles(manifest_path: pathlib.Path) -> tuple[dict[str, Any]
                 "title": raw_article.get("title"),
                 "entity_terms": raw_article.get("entity_terms") or (),
                 "visual_exception": raw_article.get("visual_exception"),
+                "serp_benchmark": (
+                    json.loads(
+                        (
+                            manifest_path.parent / raw_article["serp_benchmark_path"]
+                            if not pathlib.Path(raw_article["serp_benchmark_path"]).is_absolute()
+                            else pathlib.Path(raw_article["serp_benchmark_path"])
+                        ).read_text(encoding="utf-8")
+                    )
+                    if raw_article.get("serp_benchmark_path")
+                    else raw_article.get("serp_benchmark")
+                ),
+                "require_serp_benchmark": bool(raw_article.get("require_serp_benchmark")),
             }
         )
     return payload, articles
@@ -858,6 +1019,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     article_parser.add_argument("--title")
     article_parser.add_argument("--entity", action="append", default=[])
     article_parser.add_argument("--visual-exception")
+    article_parser.add_argument("--serp-benchmark")
+    article_parser.add_argument("--require-serp-benchmark", action="store_true")
     article_parser.add_argument(
         "--word-threshold", type=int, default=DEFAULT_LONG_FORM_WORD_THRESHOLD
     )
@@ -896,6 +1059,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             entity_terms=args.entity,
             visual_exception=args.visual_exception,
             word_threshold=args.word_threshold,
+            serp_benchmark=(
+                json.loads(pathlib.Path(args.serp_benchmark).expanduser().read_text(encoding="utf-8"))
+                if args.serp_benchmark
+                else None
+            ),
+            require_serp_benchmark=args.require_serp_benchmark,
         )
         output = args.output
     else:

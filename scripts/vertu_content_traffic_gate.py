@@ -31,6 +31,8 @@ DIMENSION_KEYS = tuple(key for key in SCORE_WEIGHTS if key != "market_demand")
 PASSING_SCORE = 80.0
 AVAILABLE = "AVAILABLE"
 SOURCE_UNAVAILABLE = "SOURCE_UNAVAILABLE"
+NOT_APPLICABLE = "NOT_APPLICABLE"
+INSUFFICIENT_SAMPLE = "INSUFFICIENT_SAMPLE"
 TREND_CLASSES = {"REALTIME_HOT", "RISING_SEARCH", "EVERGREEN_SEARCH"}
 EDITORIAL_SIGNALS = {"EDITORIAL_BREAKOUT", "CURRENT_CONFIRMED", "NONE"}
 TREND_VELOCITY_CAPS = {
@@ -69,6 +71,39 @@ D2TR_MAX_CONTEXT_AGE_HOURS = 8.0
 TRAFFIC_GATE_CONTRACT_VERSION = "traffic-acquisition-v3.12.0"
 TRAFFIC_GATE_RUNTIME_VERSION = "3.12.0"
 SCORE_SOURCE = "computed_v3_12_0"
+HYBRID_TRAFFIC_GATE_CONTRACT_VERSION = "traffic-acquisition-v3.16.0-trial"
+HYBRID_SCORE_SOURCE = "computed_hybrid_v3_16_0_trial"
+FACTOR_SCORE_MODES = {"legacy", "hybrid_trial"}
+BRAND_MINDSET_GATE_CONTRACT_VERSION = "brand-mindset-fit-v1"
+BRAND_MINDSET_CLASSES = {"CORE_MINDSPACE", "QUALIFIED_ADJACENT"}
+BRAND_MINDSET_PROFILES = {"stable", "recovery"}
+BRAND_CONFLICT_VETO_MAP = {
+    "COMMODITY_LIFESTYLE_MISMATCH": "commodity_lifestyle_mismatch",
+    "FORCED_BRAND_ASSOCIATION": "forced_brand_association",
+    "PRICE_ONLY_LUXURY_LABEL": "price_only_luxury_label",
+    "OUTSIDE_BRAND_MINDSPACE": "outside_brand_mindspace",
+}
+HYBRID_LEGACY_WEIGHT = 0.80
+HYBRID_FACTOR_WEIGHT = 0.20
+HYBRID_MIN_FACTOR_COVERAGE = 30.0
+HYBRID_MAX_COVERAGE_PENALTY = 15.0
+HYBRID_COVERAGE_PENALTY_PER_POINT = 0.20
+HYBRID_CORE_FACTORS = (
+    "demand_provider_family_count",
+    "sanity_exact_intent_overlap_count",
+    "cannibalisation_safety",
+    "visual_specificity_checks_passed",
+    "reader_decision_checks_passed",
+    "original_value_checks_passed",
+    "vertu_right_to_win_checks_passed",
+)
+HYBRID_DEMAND_MAGNITUDE_FACTORS = (
+    "keyword_planner_avg_monthly_searches",
+    "keyword_planner_recent_searches",
+    "gsc_candidate_clicks",
+    "gsc_candidate_impressions",
+    "official_trends_interest",
+)
 GSC_MIN_CLICKS = 3
 GSC_MIN_IMPRESSIONS = 100
 SEARCH_DEMAND_PROVIDER_FAMILIES = {
@@ -76,6 +111,213 @@ SEARCH_DEMAND_PROVIDER_FAMILIES = {
     "google_trends",
     "google_ads_keyword_planner",
 }
+
+DIRECT_FACTOR_MODEL_CONTRACT_VERSION = "content-factor-model-v1"
+DIRECT_FACTOR_SCORE_SOURCE = "computed_factor_v1_shadow"
+DIRECT_FACTOR_MIN_DIAGNOSTIC_COVERAGE = 70.0
+DIRECT_FACTOR_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "keyword_planner_avg_monthly_searches": {
+        "weight": 6.0,
+        "transform": "log",
+        "minimum": 10.0,
+        "maximum": 100_000.0,
+    },
+    "keyword_planner_recent_searches": {
+        "weight": 4.0,
+        "transform": "log",
+        "minimum": 10.0,
+        "maximum": 100_000.0,
+    },
+    "keyword_planner_growth_pct": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": -50.0,
+        "maximum": 100.0,
+    },
+    "keyword_planner_stability": {
+        "weight": 2.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 1.0,
+    },
+    "gsc_candidate_clicks": {
+        "weight": 4.0,
+        "transform": "log",
+        "minimum": 1.0,
+        "maximum": 1_000.0,
+    },
+    "gsc_candidate_impressions": {
+        "weight": 4.0,
+        "transform": "log",
+        "minimum": 100.0,
+        "maximum": 100_000.0,
+    },
+    "gsc_candidate_ctr": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 0.10,
+    },
+    "gsc_candidate_growth_pct": {
+        "weight": 2.0,
+        "transform": "linear",
+        "minimum": -50.0,
+        "maximum": 100.0,
+    },
+    "demand_provider_family_count": {
+        "weight": 4.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 3.0,
+    },
+    "demand_market_count": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 9.0,
+    },
+    "official_trends_interest": {
+        "weight": 4.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 100.0,
+    },
+    "official_trends_growth_pct": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": -50.0,
+        "maximum": 200.0,
+    },
+    "official_trends_market_count": {
+        "weight": 2.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 9.0,
+    },
+    "official_trends_freshness_hours": {
+        "weight": 2.0,
+        "transform": "inverse_linear",
+        "minimum": 0.0,
+        "maximum": 24.0,
+    },
+    "trend_persistence_periods": {
+        "weight": 2.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 6.0,
+    },
+    "editorial_independent_coverage_count": {
+        "weight": 2.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 5.0,
+    },
+    "editorial_community_velocity": {
+        "weight": 1.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 100.0,
+    },
+    "primary_source_freshness_hours": {
+        "weight": 2.0,
+        "transform": "inverse_linear",
+        "minimum": 0.0,
+        "maximum": 72.0,
+    },
+    "historical_discover_cluster_clicks": {
+        "weight": 5.0,
+        "transform": "log",
+        "minimum": 1.0,
+        "maximum": 100_000.0,
+    },
+    "historical_discover_cluster_ctr": {
+        "weight": 4.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 0.10,
+    },
+    "historical_search_cluster_clicks": {
+        "weight": 4.0,
+        "transform": "log",
+        "minimum": 1.0,
+        "maximum": 100_000.0,
+    },
+    "historical_search_cluster_ctr": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 0.10,
+    },
+    "historical_ga4_engagement_rate": {
+        "weight": 2.0,
+        "transform": "linear",
+        "minimum": 0.20,
+        "maximum": 0.80,
+    },
+    "historical_cluster_growth_pct": {
+        "weight": 2.0,
+        "transform": "linear",
+        "minimum": -50.0,
+        "maximum": 100.0,
+    },
+    "serp_weak_result_count": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 5.0,
+    },
+    "serp_freshness_gap_days": {
+        "weight": 2.0,
+        "transform": "log",
+        "minimum": 1.0,
+        "maximum": 1_095.0,
+    },
+    "sanity_exact_intent_overlap_count": {
+        "weight": 5.0,
+        "transform": "inverse_linear",
+        "minimum": 0.0,
+        "maximum": 3.0,
+    },
+    "cannibalisation_safety": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 1.0,
+    },
+    "visual_specificity_checks_passed": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 4.0,
+    },
+    "reader_decision_checks_passed": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 5.0,
+    },
+    "original_value_checks_passed": {
+        "weight": 5.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 4.0,
+    },
+    "vertu_right_to_win_checks_passed": {
+        "weight": 3.0,
+        "transform": "linear",
+        "minimum": 0.0,
+        "maximum": 4.0,
+    },
+}
+
+if len(DIRECT_FACTOR_REGISTRY) != 32:
+    raise RuntimeError("direct factor registry must contain exactly 32 factors")
+if not math.isclose(
+    sum(float(spec["weight"]) for spec in DIRECT_FACTOR_REGISTRY.values()),
+    100.0,
+    abs_tol=1e-9,
+):
+    raise RuntimeError("direct factor registry weights must total 100")
 
 
 def _provider_family(
@@ -327,6 +569,72 @@ def _snapshot_fingerprint(snapshot: Dict[str, Any]) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _brand_mindset_fingerprint(payload: Dict[str, Any]) -> str:
+    material = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"fingerprint", "snapshot_fingerprint"}
+    }
+    encoded = json.dumps(
+        material,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _enforce_brand_mindset_gate(
+    row: Dict[str, Any], errors: List[str], vetoes: List[str], required: bool
+) -> bool:
+    if not required:
+        return False
+    gate = row.get("brand_mindset_gate")
+    if not isinstance(gate, dict):
+        vetoes.append("brand_mindset_gate_invalid")
+        return True
+    fingerprint = str(gate.get("fingerprint") or "")
+    valid = (
+        gate.get("contract_version") == BRAND_MINDSET_GATE_CONTRACT_VERSION
+        and len(fingerprint) == 64
+        and fingerprint == _brand_mindset_fingerprint(gate)
+        and gate.get("verdict") in {"PASS", "HOLD", "REJECT"}
+        and gate.get("brand_mindset_class")
+        in BRAND_MINDSET_CLASSES.union({"UNQUALIFIED"})
+        and all(
+            gate.get(key) is False
+            for key in (
+                "traffic_score_authority",
+                "demand_authority",
+                "trend_label_authority",
+                "qa_authority",
+                "publication_authority",
+            )
+        )
+    )
+    if not valid:
+        vetoes.append("brand_mindset_gate_invalid")
+        return True
+
+    verdict = gate.get("verdict")
+    classification = gate.get("brand_mindset_class")
+    if verdict == "HOLD":
+        vetoes.append("brand_mindset_evidence_incomplete")
+    elif verdict == "REJECT":
+        vetoes.append("brand_mindset_unqualified")
+        for conflict in gate.get("brand_conflict_veto") or []:
+            mapped = BRAND_CONFLICT_VETO_MAP.get(str(conflict).strip().upper())
+            if mapped:
+                vetoes.append(mapped)
+    elif classification not in BRAND_MINDSET_CLASSES:
+        vetoes.append("brand_mindset_gate_invalid")
+
+    audience_fit_lane = str(row.get("audience_fit_lane") or "").strip().upper()
+    if audience_fit_lane in {"EXPLORATION", "EXPLORATION_CANDIDATE"}:
+        vetoes.append("automatic_exploration_disabled")
+    return True
 
 
 def _validated_learning_priors(payload: Any) -> List[Dict[str, Any]]:
@@ -900,6 +1208,312 @@ def _validate_evidence_block(
     return score
 
 
+def _normalise_direct_factor(raw_value: float, spec: Dict[str, Any]) -> float:
+    minimum = float(spec["minimum"])
+    maximum = float(spec["maximum"])
+    if maximum <= minimum:
+        raise ValueError("direct factor maximum must be greater than minimum")
+    transform = str(spec.get("transform") or "").strip()
+    bounded = max(minimum, min(maximum, raw_value))
+    if transform == "linear":
+        ratio = (bounded - minimum) / (maximum - minimum)
+    elif transform == "inverse_linear":
+        ratio = 1.0 - ((bounded - minimum) / (maximum - minimum))
+    elif transform == "log":
+        if minimum <= 0 or maximum <= 0:
+            raise ValueError("log direct factor bounds must be positive")
+        ratio = (math.log(bounded) - math.log(minimum)) / (
+            math.log(maximum) - math.log(minimum)
+        )
+    else:
+        raise ValueError(f"unsupported direct factor transform:{transform}")
+    return round(max(0.0, min(1.0, ratio)) * 100.0, 2)
+
+
+def _evaluate_direct_factor_model(candidate: Dict[str, Any]) -> Dict[str, Any]:
+    """Calculate a provenance-bound shadow score without changing production gates."""
+
+    evidence = candidate.get("direct_factor_evidence")
+    if evidence is None:
+        return {
+            "contract_version": DIRECT_FACTOR_MODEL_CONTRACT_VERSION,
+            "score_source": DIRECT_FACTOR_SCORE_SOURCE,
+            "mode": "SHADOW",
+            "status": "NOT_PROVIDED",
+            "factor_count_total": len(DIRECT_FACTOR_REGISTRY),
+            "factor_count_available": 0,
+            "factor_count_unavailable": 0,
+            "factor_count_not_applicable": 0,
+            "factor_count_insufficient_sample": 0,
+            "factor_count_missing": len(DIRECT_FACTOR_REGISTRY),
+            "factor_count_invalid": 0,
+            "applicable_weight_total": 100.0,
+            "coverage_weight_pct": 0.0,
+            "observed_weighted_score": 0.0,
+            "coverage_normalized_score": None,
+            "diagnostic_usable": False,
+            "minimum_diagnostic_coverage_pct": DIRECT_FACTOR_MIN_DIAGNOSTIC_COVERAGE,
+            "can_change_production_decision": False,
+            "validation_errors": [],
+            "factors": {},
+        }
+    if not isinstance(evidence, dict):
+        return {
+            "contract_version": DIRECT_FACTOR_MODEL_CONTRACT_VERSION,
+            "score_source": DIRECT_FACTOR_SCORE_SOURCE,
+            "mode": "SHADOW",
+            "status": "INVALID",
+            "factor_count_total": len(DIRECT_FACTOR_REGISTRY),
+            "factor_count_available": 0,
+            "factor_count_unavailable": 0,
+            "factor_count_not_applicable": 0,
+            "factor_count_insufficient_sample": 0,
+            "factor_count_missing": len(DIRECT_FACTOR_REGISTRY),
+            "factor_count_invalid": 1,
+            "applicable_weight_total": 100.0,
+            "coverage_weight_pct": 0.0,
+            "observed_weighted_score": 0.0,
+            "coverage_normalized_score": None,
+            "diagnostic_usable": False,
+            "minimum_diagnostic_coverage_pct": DIRECT_FACTOR_MIN_DIAGNOSTIC_COVERAGE,
+            "can_change_production_decision": False,
+            "validation_errors": ["direct_factor_evidence_must_be_object"],
+            "factors": {},
+        }
+
+    errors: List[str] = []
+    factors: Dict[str, Dict[str, Any]] = {}
+    available_count = 0
+    unavailable_count = 0
+    not_applicable_count = 0
+    insufficient_sample_count = 0
+    missing_count = 0
+    invalid_count = 0
+    applicable_weight = sum(
+        float(spec["weight"]) for spec in DIRECT_FACTOR_REGISTRY.values()
+    )
+    available_weight = 0.0
+    observed_weighted_score = 0.0
+
+    unknown_keys = sorted(set(evidence) - set(DIRECT_FACTOR_REGISTRY))
+    errors.extend(f"unknown_direct_factor:{key}" for key in unknown_keys)
+
+    for key, spec in DIRECT_FACTOR_REGISTRY.items():
+        weight = float(spec["weight"])
+        block = evidence.get(key)
+        factor_row: Dict[str, Any] = {
+            "weight": weight,
+            "transform": spec["transform"],
+            "minimum": spec["minimum"],
+            "maximum": spec["maximum"],
+        }
+        if block is None:
+            missing_count += 1
+            factor_row["status"] = "MISSING"
+            factors[key] = factor_row
+            continue
+        if not isinstance(block, dict):
+            invalid_count += 1
+            error = f"invalid_direct_factor_block:{key}"
+            errors.append(error)
+            factor_row.update({"status": "INVALID", "errors": [error]})
+            factors[key] = factor_row
+            continue
+
+        status = str(block.get("status") or "").strip().upper()
+        observed_at = str(block.get("observed_at") or "").strip()
+        if status in {SOURCE_UNAVAILABLE, NOT_APPLICABLE, INSUFFICIENT_SAMPLE}:
+            factor_errors = []
+            reason = str(block.get("reason") or "").strip()
+            if not reason:
+                factor_errors.append(f"missing_direct_factor_status_reason:{key}")
+            if not observed_at:
+                factor_errors.append(f"missing_direct_factor_observed_at:{key}")
+            if factor_errors:
+                invalid_count += 1
+                errors.extend(factor_errors)
+                factor_row.update({"status": "INVALID", "errors": factor_errors})
+            elif status == SOURCE_UNAVAILABLE:
+                unavailable_count += 1
+                factor_row.update(
+                    {
+                        "status": SOURCE_UNAVAILABLE,
+                        "reason": reason,
+                        "observed_at": observed_at,
+                    }
+                )
+            elif status == NOT_APPLICABLE:
+                not_applicable_count += 1
+                applicable_weight -= weight
+                factor_row.update(
+                    {
+                        "status": NOT_APPLICABLE,
+                        "reason": reason,
+                        "observed_at": observed_at,
+                    }
+                )
+            else:
+                insufficient_sample_count += 1
+                factor_row.update(
+                    {
+                        "status": INSUFFICIENT_SAMPLE,
+                        "reason": reason,
+                        "observed_at": observed_at,
+                    }
+                )
+                raw_value = _number(block.get("raw_value"))
+                if raw_value is not None:
+                    factor_row["raw_value"] = raw_value
+                refs = block.get("evidence_refs")
+                if isinstance(refs, list) and any(str(ref).strip() for ref in refs):
+                    factor_row["evidence_refs"] = copy.deepcopy(refs)
+            factors[key] = factor_row
+            continue
+
+        factor_errors: List[str] = []
+        if status != AVAILABLE:
+            factor_errors.append(f"invalid_direct_factor_status:{key}")
+        if "score_100" in block:
+            factor_errors.append(f"hand_authored_factor_score:{key}")
+        raw_value = _number(block.get("raw_value"))
+        if raw_value is None:
+            factor_errors.append(f"invalid_direct_factor_raw_value:{key}")
+        refs = block.get("evidence_refs")
+        if not isinstance(refs, list) or not any(str(ref).strip() for ref in refs):
+            factor_errors.append(f"missing_direct_factor_evidence:{key}")
+        if not observed_at:
+            factor_errors.append(f"missing_direct_factor_observed_at:{key}")
+        if factor_errors:
+            invalid_count += 1
+            errors.extend(factor_errors)
+            factor_row.update({"status": "INVALID", "errors": factor_errors})
+            factors[key] = factor_row
+            continue
+
+        assert raw_value is not None
+        normalised_score = _normalise_direct_factor(raw_value, spec)
+        weighted_score = round(normalised_score * weight / 100.0, 4)
+        available_count += 1
+        available_weight += weight
+        observed_weighted_score += weighted_score
+        factor_row.update(
+            {
+                "status": AVAILABLE,
+                "raw_value": raw_value,
+                "score_100": normalised_score,
+                "weighted_score": weighted_score,
+                "observed_at": observed_at,
+                "evidence_refs": copy.deepcopy(refs),
+            }
+        )
+        factors[key] = factor_row
+
+    coverage = (
+        round(available_weight * 100.0 / applicable_weight, 2)
+        if applicable_weight > 0
+        else 0.0
+    )
+    observed_score = round(observed_weighted_score, 2)
+    normalised_score = (
+        round(observed_weighted_score * 100.0 / available_weight, 2)
+        if available_weight > 0
+        else None
+    )
+    diagnostic_usable = (
+        invalid_count == 0 and coverage >= DIRECT_FACTOR_MIN_DIAGNOSTIC_COVERAGE
+    )
+    if invalid_count:
+        status = "INVALID"
+    elif coverage >= 100.0:
+        status = "VALID_COMPLETE"
+    elif diagnostic_usable:
+        status = "VALID_PARTIAL"
+    else:
+        status = "INSUFFICIENT_FACTOR_COVERAGE"
+    return {
+        "contract_version": DIRECT_FACTOR_MODEL_CONTRACT_VERSION,
+        "score_source": DIRECT_FACTOR_SCORE_SOURCE,
+        "mode": "SHADOW",
+        "status": status,
+        "factor_count_total": len(DIRECT_FACTOR_REGISTRY),
+        "factor_count_available": available_count,
+        "factor_count_unavailable": unavailable_count,
+        "factor_count_not_applicable": not_applicable_count,
+        "factor_count_insufficient_sample": insufficient_sample_count,
+        "factor_count_missing": missing_count,
+        "factor_count_invalid": invalid_count,
+        "applicable_weight_total": round(applicable_weight, 2),
+        "available_weight_total": round(available_weight, 2),
+        "coverage_weight_pct": coverage,
+        "observed_weighted_score": observed_score,
+        "coverage_normalized_score": normalised_score,
+        "diagnostic_usable": diagnostic_usable,
+        "minimum_diagnostic_coverage_pct": DIRECT_FACTOR_MIN_DIAGNOSTIC_COVERAGE,
+        "can_change_production_decision": False,
+        "validation_errors": sorted(set(errors)),
+        "factors": factors,
+    }
+
+
+def _hybrid_factor_component(
+    direct_factor_model: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Validate the factor evidence used by the opt-in hybrid score."""
+
+    blockers: List[str] = []
+    factors = direct_factor_model.get("factors")
+    if not isinstance(factors, dict):
+        factors = {}
+    coverage = _number(direct_factor_model.get("coverage_weight_pct")) or 0.0
+    normalised_score = _number(
+        direct_factor_model.get("coverage_normalized_score")
+    )
+    invalid_count = int(direct_factor_model.get("factor_count_invalid") or 0)
+
+    if invalid_count > 0:
+        blockers.append("invalid_direct_factor_evidence")
+    if coverage < HYBRID_MIN_FACTOR_COVERAGE:
+        blockers.append("insufficient_direct_factor_coverage")
+    for factor_key in HYBRID_CORE_FACTORS:
+        if str((factors.get(factor_key) or {}).get("status") or "") != AVAILABLE:
+            blockers.append(f"missing_core_direct_factor:{factor_key}")
+    if not any(
+        str((factors.get(factor_key) or {}).get("status") or "") == AVAILABLE
+        for factor_key in HYBRID_DEMAND_MAGNITUDE_FACTORS
+    ):
+        blockers.append("missing_direct_demand_magnitude_factor")
+    if normalised_score is None:
+        blockers.append("missing_direct_factor_normalized_score")
+
+    missing_applicable_pct = round(max(0.0, 100.0 - coverage), 2)
+    coverage_penalty = round(
+        min(
+            HYBRID_MAX_COVERAGE_PENALTY,
+            missing_applicable_pct * HYBRID_COVERAGE_PENALTY_PER_POINT,
+        ),
+        2,
+    )
+    effective_factor_score = (
+        round(max(0.0, normalised_score - coverage_penalty), 2)
+        if normalised_score is not None
+        else None
+    )
+    blockers = sorted(set(blockers))
+    return {
+        "status": "READY" if not blockers else "BLOCKED",
+        "ready": not blockers,
+        "minimum_coverage_pct": HYBRID_MIN_FACTOR_COVERAGE,
+        "coverage_weight_pct": round(coverage, 2),
+        "missing_applicable_pct": missing_applicable_pct,
+        "coverage_penalty": coverage_penalty,
+        "coverage_normalized_score": normalised_score,
+        "effective_factor_score": effective_factor_score,
+        "core_factors_required": list(HYBRID_CORE_FACTORS),
+        "demand_magnitude_factors": list(HYBRID_DEMAND_MAGNITUDE_FACTORS),
+        "blockers": blockers,
+    }
+
+
 def _signal_statuses(
     signals: Any, errors: List[str]
 ) -> Tuple[
@@ -1169,8 +1783,13 @@ def evaluate_candidate(
     live_trend_verifications: Optional[Set[str]] = None,
     live_primary_verifications: Optional[Dict[str, Dict[str, Any]]] = None,
     source_velocity: Optional[Dict[str, Dict[str, Any]]] = None,
+    factor_score_mode: str = "legacy",
+    require_brand_mindset_gate: bool = False,
 ) -> Dict[str, Any]:
     """Validate one candidate and calculate its active-contract raw score."""
+
+    if factor_score_mode not in FACTOR_SCORE_MODES:
+        raise ValueError("factor_score_mode must be legacy or hybrid_trial")
 
     row = copy.deepcopy(candidate)
     errors: List[str] = []
@@ -1179,6 +1798,9 @@ def evaluate_candidate(
     slug = _normalised_slug(row.get("slug"))
     if section == "news" or slug == "news" or slug.startswith("news/"):
         vetoes.append("automatic_news_route")
+    brand_mindset_gate_enforced = _enforce_brand_mindset_gate(
+        row, errors, vetoes, require_brand_mindset_gate
+    )
 
     source_statuses, positive_signals, signal_qualifications = _signal_statuses(
         row.get("demand_signals"), errors
@@ -1271,13 +1893,35 @@ def evaluate_candidate(
         if key == "trend_velocity":
             score_breakdown[key]["raw_score_100"] = raw_trend_velocity
             score_breakdown[key]["classification_cap"] = trend_cap
-    final_score = round(
+    legacy_score = round(
         sum(value["weighted_score"] for value in score_breakdown.values()), 2
     )
+    direct_factor_model = _evaluate_direct_factor_model(row)
+    hybrid_factor_component = _hybrid_factor_component(direct_factor_model)
+    hybrid_score: Optional[float] = None
+    active_score = legacy_score
+    active_score_source = SCORE_SOURCE
+    active_contract_version = TRAFFIC_GATE_CONTRACT_VERSION
+    score_status = "ACTIVE"
+    factor_vetoes: List[str] = []
+    if factor_score_mode == "hybrid_trial":
+        active_score_source = HYBRID_SCORE_SOURCE
+        active_contract_version = HYBRID_TRAFFIC_GATE_CONTRACT_VERSION
+        if hybrid_factor_component["ready"]:
+            hybrid_score = round(
+                legacy_score * HYBRID_LEGACY_WEIGHT
+                + float(hybrid_factor_component["effective_factor_score"])
+                * HYBRID_FACTOR_WEIGHT,
+                2,
+            )
+            active_score = hybrid_score
+        else:
+            score_status = "FACTOR_EVIDENCE_BLOCKED"
+            factor_vetoes.append("insufficient_direct_factor_evidence")
+            factor_vetoes.extend(hybrid_factor_component["blockers"])
 
     lane = str(row.get("outcome_lane") or "").strip().casefold()
     sufficient_demand = False
-    demand_verdict = "REJECT"
     if lane == "search-first":
         sufficient_demand = len(positive_provider_families) >= 2
     elif lane == "discover-first":
@@ -1298,16 +1942,35 @@ def evaluate_candidate(
     else:
         errors.append("invalid_outcome_lane")
 
+    legacy_demand_verdict = "REJECT"
     if not sufficient_demand:
         vetoes.append("insufficient_independent_demand_signals")
-    elif final_score >= PASSING_SCORE:
+    elif legacy_score >= PASSING_SCORE:
+        legacy_demand_verdict = "TEST" if lane == "authority-first" else "STRONG"
+    elif legacy_score >= 70:
+        legacy_demand_verdict = "HOLD"
+    legacy_vetoes = sorted(set(vetoes))
+    legacy_eligible = (
+        legacy_score >= PASSING_SCORE
+        and legacy_demand_verdict in {"STRONG", "TEST"}
+        and not legacy_vetoes
+        and not errors
+    )
+
+    vetoes.extend(factor_vetoes)
+    demand_verdict = "REJECT"
+    if not sufficient_demand:
+        demand_verdict = "REJECT"
+    elif score_status == "FACTOR_EVIDENCE_BLOCKED":
+        demand_verdict = "REJECT"
+    elif active_score >= PASSING_SCORE:
         demand_verdict = "TEST" if lane == "authority-first" else "STRONG"
-    elif final_score >= 70:
+    elif active_score >= 70:
         demand_verdict = "HOLD"
 
     vetoes = sorted(set(vetoes))
     eligible = (
-        final_score >= PASSING_SCORE
+        active_score >= PASSING_SCORE
         and demand_verdict in {"STRONG", "TEST"}
         and not vetoes
         and not errors
@@ -1315,10 +1978,21 @@ def evaluate_candidate(
 
     row.update(
         {
-            "score": final_score,
-            "raw_score": final_score,
-            "score_source": SCORE_SOURCE,
-            "score_contract_version": TRAFFIC_GATE_CONTRACT_VERSION,
+            "score": active_score,
+            "raw_score": active_score,
+            "score_source": active_score_source,
+            "score_contract_version": active_contract_version,
+            "score_status": score_status,
+            "factor_score_mode": factor_score_mode,
+            "legacy_score": legacy_score,
+            "legacy_score_source": SCORE_SOURCE,
+            "legacy_demand_verdict": legacy_demand_verdict,
+            "legacy_eligible": legacy_eligible,
+            "hybrid_score": hybrid_score,
+            "hybrid_score_weights": {
+                "legacy": HYBRID_LEGACY_WEIGHT,
+                "direct_factor": HYBRID_FACTOR_WEIGHT,
+            },
             "score_breakdown": score_breakdown,
             "trend_class": trend_class,
             "editorial_signal": str(row.get("editorial_signal") or "").strip().upper(),
@@ -1353,6 +2027,14 @@ def evaluate_candidate(
             "validation_errors": sorted(set(errors)),
             "vetoes": vetoes,
             "eligible": eligible,
+            "brand_mindset_gate_enforced": brand_mindset_gate_enforced,
+            "direct_factor_model": direct_factor_model,
+            "direct_factor_shadow_score": direct_factor_model.get(
+                "coverage_normalized_score"
+            ),
+            "hybrid_factor_component": hybrid_factor_component,
+            "direct_factor_can_change_eligibility": factor_score_mode
+            == "hybrid_trial",
         }
     )
     return row
@@ -1389,6 +2071,9 @@ def select_portfolio(
     learning_priors: Optional[Dict[str, Any]] = None,
     provisional_learning_priors: Optional[Dict[str, Any]] = None,
     d2tr_market_context: Optional[Dict[str, Any]] = None,
+    factor_score_mode: str = "legacy",
+    require_brand_mindset_gate: bool = False,
+    brand_mindset_profile: str = "stable",
 ) -> Dict[str, Any]:
     """Evaluate candidates and select a traffic-weighted, capped portfolio."""
 
@@ -1396,6 +2081,10 @@ def select_portfolio(
         raise ValueError("max_articles must be non-negative")
     if trend_mode not in {"balanced", "realtime_hot", "evergreen"}:
         raise ValueError("trend_mode must be balanced, realtime_hot, or evergreen")
+    if factor_score_mode not in FACTOR_SCORE_MODES:
+        raise ValueError("factor_score_mode must be legacy or hybrid_trial")
+    if brand_mindset_profile not in BRAND_MINDSET_PROFILES:
+        raise ValueError("brand_mindset_profile must be stable or recovery")
     realtime_topics = (
         _realtime_topic_registry(realtime_trends_snapshot)
         if realtime_trends_snapshot is not None
@@ -1409,6 +2098,8 @@ def select_portfolio(
             live_source_verifications.get("trend_verified"),
             live_source_verifications.get("primary_verified"),
             source_velocity,
+            factor_score_mode,
+            require_brand_mindset_gate,
         )
         for candidate in candidates
     ]
@@ -1456,6 +2147,18 @@ def select_portfolio(
             rejected_row["portfolio_rejection"] = reason
             rejected.append(rejected_row)
 
+    if require_brand_mindset_gate:
+        core_target_share = 0.80 if brand_mindset_profile == "recovery" else 0.60
+        core_target = int(math.ceil(max_articles * core_target_share))
+        for row in eligible:
+            if (
+                (row.get("brand_mindset_gate") or {}).get("brand_mindset_class")
+                == "CORE_MINDSPACE"
+            ):
+                try_add(row)
+            if len(selected) >= core_target:
+                break
+
     if trend_mode == "realtime_hot":
         for row in eligible:
             if row.get("trend_class") == "REALTIME_HOT":
@@ -1483,9 +2186,21 @@ def select_portfolio(
     for row in eligible:
         try_add(row)
 
+    active_contract_version = (
+        HYBRID_TRAFFIC_GATE_CONTRACT_VERSION
+        if factor_score_mode == "hybrid_trial"
+        else TRAFFIC_GATE_CONTRACT_VERSION
+    )
+    active_score_source = (
+        HYBRID_SCORE_SOURCE if factor_score_mode == "hybrid_trial" else SCORE_SOURCE
+    )
     return {
-        "rubric_version": TRAFFIC_GATE_CONTRACT_VERSION,
-        "score_source": SCORE_SOURCE,
+        "rubric_version": active_contract_version,
+        "score_source": active_score_source,
+        "factor_score_mode": factor_score_mode,
+        "candidate_pool_fingerprint": _snapshot_fingerprint(
+            {"candidates": list(candidates)}
+        ),
         "trend_mode": trend_mode,
         "candidate_count": len(candidates),
         "max_articles": max_articles,
@@ -1506,6 +2221,65 @@ def select_portfolio(
             signal: sum(row.get("editorial_signal") == signal for row in selected)
             for signal in sorted(EDITORIAL_SIGNALS)
         },
+        "brand_mindset_mix": {
+            "contract_version": BRAND_MINDSET_GATE_CONTRACT_VERSION,
+            "enforced": require_brand_mindset_gate,
+            "profile": brand_mindset_profile,
+            "core": sum(
+                (row.get("brand_mindset_gate") or {}).get("brand_mindset_class")
+                == "CORE_MINDSPACE"
+                for row in selected
+            ),
+            "qualified_adjacent": sum(
+                (row.get("brand_mindset_gate") or {}).get("brand_mindset_class")
+                == "QUALIFIED_ADJACENT"
+                for row in selected
+            ),
+            "automatic_exploration_allowed": False
+            if require_brand_mindset_gate
+            else None,
+        },
+        "direct_factor_model_summary": {
+            "contract_version": DIRECT_FACTOR_MODEL_CONTRACT_VERSION,
+            "score_source": DIRECT_FACTOR_SCORE_SOURCE,
+            "mode": (
+                "HYBRID_TRIAL" if factor_score_mode == "hybrid_trial" else "SHADOW"
+            ),
+            "factor_count": len(DIRECT_FACTOR_REGISTRY),
+            "factor_weight_total": round(
+                sum(
+                    float(spec["weight"])
+                    for spec in DIRECT_FACTOR_REGISTRY.values()
+                ),
+                2,
+            ),
+            "candidates_with_factor_evidence": sum(
+                (row.get("direct_factor_model") or {}).get("status")
+                != "NOT_PROVIDED"
+                for row in evaluated
+            ),
+            "diagnostic_usable_candidates": sum(
+                bool((row.get("direct_factor_model") or {}).get("diagnostic_usable"))
+                for row in evaluated
+            ),
+            "hybrid_ready_candidates": sum(
+                bool((row.get("hybrid_factor_component") or {}).get("ready"))
+                for row in evaluated
+            ),
+            "hybrid_blocked_candidates": sum(
+                not bool((row.get("hybrid_factor_component") or {}).get("ready"))
+                for row in evaluated
+            ),
+            "production_decisions_affected": 0,
+            "trial_decisions_affected": (
+                sum(
+                    bool(row.get("eligible")) != bool(row.get("legacy_eligible"))
+                    for row in evaluated
+                )
+                if factor_score_mode == "hybrid_trial"
+                else 0
+            ),
+        },
         "live_source_verification": {
             "trend_evidence_count": len(
                 live_source_verifications.get("trend_verified") or []
@@ -1522,6 +2296,12 @@ def select_portfolio(
             "minimum_score": PASSING_SCORE,
             "max_same_entity": 3,
             "automatic_news_allowed": False,
+            "brand_mindset_gate_required": require_brand_mindset_gate,
+            "brand_mindset_gate_can_change_raw_score": False,
+            "brand_mindset_gate_can_create_demand": False,
+            "automatic_exploration_allowed": False
+            if require_brand_mindset_gate
+            else None,
             "realtime_hot_requires_verified_official_google_trends": True,
             "realtime_hot_reconciled_to_snapshot": bool(realtime_topics),
             "learning_priors_apply_after_eligibility": True,
@@ -1808,6 +2588,29 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default="balanced",
     )
     score_parser.add_argument(
+        "--require-brand-mindset-gate",
+        action="store_true",
+        help=(
+            "Fail closed unless every candidate carries a valid brand-mindset-fit-v1 "
+            "pre-score gate result"
+        ),
+    )
+    score_parser.add_argument(
+        "--brand-mindset-profile",
+        choices=tuple(sorted(BRAND_MINDSET_PROFILES)),
+        default="stable",
+        help="Soft core-mindspace portfolio preference after normal eligibility",
+    )
+    score_parser.add_argument(
+        "--factor-score-mode",
+        choices=tuple(sorted(FACTOR_SCORE_MODES)),
+        default="legacy",
+        help=(
+            "Opt-in hybrid_trial uses 80% legacy and 20% evidence-gated "
+            "direct-factor score; legacy remains the production default"
+        ),
+    )
+    score_parser.add_argument(
         "--realtime-trends",
         type=Path,
         help="Official realtime-trends snapshot; required for realtime_hot mode",
@@ -1939,6 +2742,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 learning_priors,
                 provisional_learning_priors,
                 d2tr_market_context,
+                args.factor_score_mode,
+                args.require_brand_mindset_gate,
+                args.brand_mindset_profile,
             ),
         )
     else:

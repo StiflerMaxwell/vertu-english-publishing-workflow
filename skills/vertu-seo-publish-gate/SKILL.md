@@ -2,7 +2,7 @@
 name: vertu-seo-publish-gate
 description: VERTU 海外官网 SEO 内容发布前 QA Gate。用于审核 QuickCreator / AI / 人工草稿，输出 PASS / FIX / BLOCK、具体修改意见、SEO 建议、Sanity Patch Plan 和写入权限报告。授权后只允许写入 Sanity Draft，禁止直接 Publish。
 metadata:
-  version: "0.7.1"
+  version: "0.8.0"
   platforms: "openclaw, hermes, lobster"
   owner: "VERTU Overseas Web"
   risk_level: "controlled"
@@ -10,7 +10,7 @@ metadata:
 
 # VERTU SEO Publish Gate
 
-Current policy version: `0.7.1`.
+Current policy version: `0.8.0`.
 
 ## 1. Skill Purpose
 
@@ -43,7 +43,7 @@ Use this skill when:
 - An AI-generated SEO article needs pre-publish QA
 - A blog / guide / AI tools / newsroom / product story draft needs review
 - Existing Sanity content needs content-quality QA
-- Max asks for SEO content QA, publish gate, Sanity patch plan, or draft repair
+- the authorised operator asks for SEO content QA, publish gate, Sanity patch plan, or draft repair
 
 Do not use this skill for:
 
@@ -73,6 +73,13 @@ producer_skill_version: string
 publication_run_id: string
 article_key: string
 draft_bundle_sha256: string
+serp_benchmark_contract_version: serp-benchmark-v1
+serp_benchmark_status: BENCHMARK_PASS
+serp_benchmark_fingerprint: string
+serp_benchmark_path: string
+ranking_page_anatomy_path: string
+content_differentiation_brief_path: string
+original_value_delta: string
 source_identity_type: artifact_bundle | sanity_draft_revision | published_revision
 release_gate_role: preflight | prepublish | postpublish_audit
 qa_record_id: optional string before write; required in returned handoff
@@ -157,7 +164,7 @@ Forbidden:
 - Add fake media quotes, awards, rankings, or user reviews
 - Use Sanity token directly
 - Write without `_rev` check
-- Write without Max approval
+- Write without the authorised operator approval
 
 ### 4.2 Sanity Write Rule
 
@@ -201,7 +208,8 @@ Every real QA run must be traceable.
 - The QA Run must include `qa_run_id`, `skill_version`, `review_round`, `article_url`, Sanity document ID, source revision, score, decision, risk, Patch Action, and Critical Veto result.
 - Each finding must include its own stable patch/finding ID, evidence label, location, before/after copy, handling status, and link back to the QA Run.
 - Every new QA Run must record `qa_policy_id`, `qa_policy_version`, `qa_policy_hash`, and `evaluation_profile`. Its deterministic identity is `Sanity Doc ID + Source Rev + QA Policy Hash + Evaluation Profile`; free-text `Skill Version` alone is not an identity key. The workspace-path-independent hash sources are defined by the shared production-chain rule below.
-- Every new production-chain QA Run must also follow `${VERTU_PDCA_ROOT}/contracts/VERTU-QA-Handoff-Contract.md`. The policy hash covers, in order, `SKILL.md`, `references/qa-tracking-contract.md`, `scripts/vertu_qa_policy.py`, `scripts/vertu_editorial_safeguards.py`, and that shared handoff contract. Record the producer version, draft-bundle fingerprint, release-gate role and exact source identity; emit the immutable Base QA record ID and `qa_result_fingerprint` after persistence.
+- Every new production-chain QA Run must also follow `${VERTU_PDCA_ROOT}/docs/03-运行/VERTU-QA-Handoff-Contract.md`. The policy hash covers, in order, `SKILL.md`, `references/qa-tracking-contract.md`, `scripts/vertu_qa_policy.py`, `scripts/vertu_editorial_safeguards.py`, and that shared handoff contract. Record the producer version, draft-bundle fingerprint, release-gate role and exact source identity; emit the immutable Base QA record ID and `qa_result_fingerprint` after persistence.
+- Producer 3.18.0+ production preflight also requires `serp-benchmark-v1`, verdict `BENCHMARK_PASS`, the exact benchmark fingerprint and all three benchmark artifacts inside the reviewed bundle. Verify that the final article visibly implements the declared original-value delta. Missing, mismatched or generic implementation creates required Finding `SERP_DIFFERENTIATION_MISMATCH` and forces `FIX`; QA must never reconstruct a missing benchmark from the draft.
 - `preflight` evaluates the fingerprinted artifact bundle. `prepublish` evaluates the exact Sanity Draft revision. `postpublish_audit` reconciles the exact published revision. QA remains independent and never performs the publication mutation.
 - Historical rows without provable shared identity remain `LEGACY_UNVERIFIED`; never relabel them current or reuse them to authorise a new release.
 - A changed Sanity `_rev` or materially changed draft creates a **new** QA Run. Link it with `parent_qa_run_id`; never overwrite the previous score or findings.
@@ -246,7 +254,7 @@ The QA skill never performs the publication mutation itself. It supplies the ind
 
 Total score: 100.
 
-| Dimension                                | Max  |
+| Dimension                                | the authorised operator  |
 | ---------------------------------------- | ---: |
 | Search Intent / SERP Fit                 |   20 |
 | Original Value / Luxury Tech E-E-A-T     |   20 |
@@ -264,6 +272,7 @@ Check:
 - Are H2s aligned with one dominant intent?
 - Is the article informational, commercial investigation, transactional, or navigational?
 - Does the content satisfy the likely SERP expectation?
+- For producer 3.18.0+ production-chain runs, does the exact `serp-benchmark-v1` query/market/intent match the handoff, and is its fingerprint part of the reviewed bundle?
 
 Serious issues:
 
@@ -271,6 +280,7 @@ Serious issues:
 - Comparison article without comparison
 - Product-intent article that only gives generic background
 - Hot topic article that fails to explain the actual event
+- Selected-query benchmark absent, source-blocked, reframed, replaced, or fingerprint-mismatched
 
 ### 5.2 Original Value / Luxury Tech E-E-A-T
 
@@ -280,6 +290,7 @@ Check:
 - Does it include executive use cases, luxury tech thinking, privacy, craft, concierge, or product relevance?
 - Does it contain real judgment instead of generic explanation?
 - Is it meaningfully different from existing site content?
+- Does the final article substantively deliver the exact original-value delta declared by the post-selection benchmark?
 
 Serious issues:
 
@@ -288,6 +299,7 @@ Serious issues:
 - Thin content
 - Rewrites the internet without adding value
 - Duplicates existing site topics without incremental value
+- Mentions a decision matrix, comparison, timeline, calculation or checklist in the benchmark but does not actually provide it
 
 ### 5.3 Claims / Hallucination
 
@@ -441,6 +453,14 @@ For every final article, run `scripts/vertu_editorial_safeguards.py article` aga
 - A buyer/comparison draft at or above 1,500 substantive words without a descriptive in-body evidence visual or explicit editorial exception emits `BODY_VISUAL_MISSING` as a `recommended`, non-blocking warning in phase one. The hero image does not count.
 - Required safeguard Findings contribute to `unresolved_required` in `qa-handoff-v1`. A safeguard result from a different body or batch cannot authorise release.
 
+### 5.5.2 SERP differentiation safeguard
+
+For producer 3.18.0+ production-chain preflight, load the exact `serp-benchmark.json`, `ranking-page-anatomy.json` and `content-differentiation-brief.md` from the reviewed bundle. Recompute or verify their declared fingerprints and compare the required original-value delta with the final body and value object.
+
+- `BENCHMARK_PASS` plus exact identity and substantive implementation passes this safeguard.
+- Missing artifacts, a non-pass benchmark, query/market/intent drift, fingerprint mismatch, or absent/generic implementation emits `SERP_DIFFERENTIATION_MISMATCH` as an unresolved `required` Finding and forces `FIX`.
+- This QA check does not rerun topic scoring, scrape the SERP, copy ranking prose or authorise publication.
+
 ### 5.6 Compliance / Risk
 
 Check:
@@ -529,7 +549,7 @@ Every factual statement, SERP judgement, claim, and compliance verdict produced 
 | Label           | Source / Trigger                                                          |
 | --------------- | ------------------------------------------------------------------------- |
 | `Measured`      | Hard keyword match or exact text match against source content             |
-| `User-provided` | Max or internal VERTU material supplied via input contract                |
+| `User-provided` | the authorised operator or internal VERTU material supplied via input contract                |
 | `Estimated`     | LLM semantic judgement, inference, or model-based reasoning               |
 | `Unknown`       | Cannot be verified; insufficient data                                     |
 
@@ -550,13 +570,13 @@ Every factual statement, SERP judgement, claim, and compliance verdict produced 
 
 - `blood glucose` literal found in a product page → `Measured` that the term appears. Compliance verdict: `Estimated` (until legal approves).
 - LLM says "this paragraph reads as a medical claim" → `Estimated`. Never `Measured`.
-- Max explicitly states "the price is $4,300" in input → `User-provided`. Compliance verdict: still requires legal / policy confirmation before publishing.
+- the authorised operator explicitly states "the price is $4,300" in input → `User-provided`. Compliance verdict: still requires legal / policy confirmation before publishing.
 
 ---
 
 ## 6. Critical Veto Items
 
-If any item is hit, final status must be **BLOCK** unless Max explicitly asks for low-risk local draft repair only.
+If any item is hit, final status must be **BLOCK** unless the authorised operator explicitly asks for low-risk local draft repair only.
 
 ```
 critical_veto_items:
@@ -641,7 +661,7 @@ Every run must output:
 
 ## 2. Score Breakdown
 
-| Dimension                                 | Score | Max | Comment |
+| Dimension                                 | Score | the authorised operator | Comment |
 | ----------------------------------------- | ----: | --: | ------- |
 | Search Intent / SERP Fit                  |   x   |  20 |         |
 | Original Value / Luxury Tech E-E-A-T      |   x   |  20 |         |
@@ -704,7 +724,7 @@ Output the permission report.
 
 If not approved:
 
-> Not executed. Awaiting Max approval to write Sanity Draft.
+> Not executed. Awaiting the authorised operator approval to write Sanity Draft.
 
 If approved and executed:
 
@@ -750,7 +770,7 @@ All replacement copy must be UK English.
 ## 10. Sanity Patch Plan Rules
 
 When status is PASS or FIX, generate a Patch Plan.
-When status is BLOCK, emit a non-executable plan with `patches: []` unless Max explicitly asks for local low-risk draft repair.
+When status is BLOCK, emit a non-executable plan with `patches: []` unless the authorised operator explicitly asks for local low-risk draft repair.
 
 Patch Plan JSON format:
 
@@ -911,7 +931,7 @@ Only execute writer stage if **all** conditions are true:
 ```
 write_mode: apply_draft
 approval_status: approved_to_draft
-approved_by: Max or authorised operator
+approved_by: the authorised operator or authorised operator
 patch_plan.safe_to_write_draft: true
 patch_plan.publish_requested: false
 sanity.doc_id: exists
@@ -1020,7 +1040,7 @@ Claim confirmation required before draft write
 
 ## 14. Approval Phrase
 
-Only Max or an authorised operator can approve draft writing.
+Only the authorised operator or an authorised operator can approve draft writing.
 
 Required approval format:
 
@@ -1028,7 +1048,7 @@ Required approval format:
 APPROVED_TO_DRAFT
 qa_run_id: {{qa_run_id}}
 doc_id: {{doc_id}}
-approved_by: Max
+approved_by: the authorised operator
 ```
 
 Without this exact approval, do not write.

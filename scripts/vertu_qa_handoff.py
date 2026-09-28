@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import pathlib
 import re
@@ -20,6 +21,7 @@ PRODUCER_SKILL_ID = "vertu-english-blog-pipeline"
 QA_POLICY_ID = "vertu-seo-publish-gate"
 COMPATIBLE_PRODUCER_MIN = (3, 10, 0)
 COMPATIBLE_PRODUCER_MAX_EXCLUSIVE = (4, 0, 0)
+BRAND_GATE_REQUIRED_MIN = (3, 19, 0)
 COMPATIBLE_QA_MIN = (0, 6, 0)
 COMPATIBLE_QA_MAX_EXCLUSIVE = (1, 0, 0)
 
@@ -46,6 +48,14 @@ SEMVER_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
 
 class QAHandoffError(ValueError):
     """Raised when a handoff cannot be evaluated deterministically."""
+
+
+def current_policy_identity() -> dict[str, str]:
+    path = pathlib.Path(__file__).with_name("vertu_qa_policy.py")
+    spec = importlib.util.spec_from_file_location("_vertu_handoff_policy", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.current_policy_identity()
 
 
 def canonical_json(value: Any) -> str:
@@ -107,6 +117,7 @@ def qa_result_fingerprint(payload: Mapping[str, Any]) -> str:
         "publication_run_id": payload.get("publication_run_id"),
         "article_key": payload.get("article_key"),
         "producer_skill": payload.get("producer_skill"),
+        "brand_mindset_gate": payload.get("brand_mindset_gate"),
         "source_identity": source,
         "release_gate_role": payload.get("release_gate_role"),
         "qa": {
@@ -209,6 +220,46 @@ def validate_handoff(
     if version_errors:
         status = "VERSION_MISMATCH"
 
+    if require_authorising_pass:
+        try:
+            current = current_policy_identity()
+        except (OSError, ValueError) as exc:
+            errors.append(f"current QA policy unavailable: {exc}")
+            status = "VERSION_MISMATCH"
+        else:
+            if qa.get("policy_version") != current["qa_policy_version"]:
+                errors.append("QA_POLICY_VERSION_MISMATCH: new release requires current policy")
+                status = "VERSION_MISMATCH"
+            if qa.get("policy_hash") != current["qa_policy_hash"]:
+                errors.append("QA_POLICY_HASH_MISMATCH: new release requires exact current bytes")
+                if status == "COMPATIBLE":
+                    status = "ARTIFACT_MISMATCH"
+
+    producer_version = None
+    try:
+        producer_version = parse_semver(
+            producer.get("version"), "producer_skill.version"
+        )
+    except QAHandoffError:
+        pass
+    if producer_version is not None and producer_version >= BRAND_GATE_REQUIRED_MIN:
+        brand_gate = payload.get("brand_mindset_gate") or {}
+        valid_brand_gate = (
+            isinstance(brand_gate, Mapping)
+            and brand_gate.get("contract_version") == "brand-mindset-fit-v1"
+            and brand_gate.get("verdict") == "PASS"
+            and brand_gate.get("brand_mindset_class")
+            in {"CORE_MINDSPACE", "QUALIFIED_ADJACENT"}
+            and isinstance(brand_gate.get("fingerprint"), str)
+            and re.fullmatch(r"[a-f0-9]{64}", brand_gate.get("fingerprint"))
+        )
+        if not valid_brand_gate:
+            errors.append(
+                "producer >=3.19.0 requires an exact passing brand-mindset-fit-v1 identity"
+            )
+            if status == "COMPATIBLE":
+                status = "TRACKING_INCOMPLETE"
+
     role = payload.get("release_gate_role")
     source_type = source.get("type")
     if role not in SOURCE_ROLE_MATRIX or SOURCE_ROLE_MATRIX.get(role) != source_type:
@@ -245,6 +296,9 @@ def validate_handoff(
     if require_authorising_pass:
         if qa.get("verdict") != "PASS":
             errors.append("authorising QA verdict must be PASS")
+        score = qa.get("score")
+        if isinstance(score, bool) or not isinstance(score, (int, float)) or not 80 <= score <= 100:
+            errors.append("authorising QA score must be between 80 and 100")
         if qa.get("patch_action") != "no_patch_needed":
             errors.append("authorising QA patch_action must be no_patch_needed")
         if qa.get("critical_veto") not in (None, False, "", "NONE"):

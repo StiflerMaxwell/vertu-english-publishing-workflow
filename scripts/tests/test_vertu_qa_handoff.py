@@ -2,6 +2,7 @@ import importlib.util
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
 
 MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "vertu_qa_handoff.py"
@@ -32,7 +33,7 @@ def compatible_payload():
             "run_id": "qa-run-1",
             "record_id": "rec-qa-1",
             "policy_id": "vertu-seo-publish-gate",
-            "policy_version": "0.6.0",
+            "policy_version": "0.8.0",
             "policy_hash": "b" * 64,
             "evaluation_profile": "official_site_standard",
             "verdict": "PASS",
@@ -46,6 +47,36 @@ def compatible_payload():
 
 
 class QAHandoffTests(unittest.TestCase):
+    def setUp(self):
+        patcher = mock.patch.object(handoff, "current_policy_identity", return_value={
+            "qa_policy_id": "vertu-seo-publish-gate",
+            "qa_policy_version": "0.8.0", "qa_policy_hash": "b" * 64})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_old_policy_is_observation_only(self):
+        payload = compatible_payload()
+        payload["qa"]["policy_version"] = "0.7.1"
+        self.assertFalse(handoff.validate_handoff(payload)["authorises_release"])
+        observed = handoff.validate_handoff(payload, require_authorising_pass=False)
+        self.assertTrue(observed["valid_evidence"])
+        self.assertFalse(observed["authorises_release"])
+
+    def test_stale_current_policy_hash_never_authorises(self):
+        payload = compatible_payload()
+        payload["qa"]["policy_hash"] = "c" * 64
+        self.assertFalse(handoff.validate_handoff(payload)["authorises_release"])
+
+    def test_pass_label_cannot_override_score_floor(self):
+        for score in (79, None, True, float("nan")):
+            payload = compatible_payload()
+            payload["qa"]["score"] = score
+            self.assertFalse(handoff.validate_handoff(payload)["authorises_release"])
+
+    def test_missing_canonical_policy_fails_closed(self):
+        with mock.patch.object(handoff, "current_policy_identity", side_effect=OSError("missing")):
+            self.assertFalse(handoff.validate_handoff(compatible_payload())["authorises_release"])
+
     def test_compatible_handoff_authorises_release(self):
         result = handoff.validate_handoff(compatible_payload())
         self.assertEqual(result["compatibility_status"], "COMPATIBLE")
@@ -53,11 +84,25 @@ class QAHandoffTests(unittest.TestCase):
 
     def test_current_producer_and_qa_pair_authorises_release(self):
         payload = compatible_payload()
-        payload["producer_skill"]["version"] = "3.11.0"
-        payload["qa"]["policy_version"] = "0.7.0"
+        payload["producer_skill"]["version"] = "3.19.0"
+        payload["qa"]["policy_version"] = "0.8.0"
+        payload["brand_mindset_gate"] = {
+            "contract_version": "brand-mindset-fit-v1",
+            "verdict": "PASS",
+            "brand_mindset_class": "CORE_MINDSPACE",
+            "fingerprint": "c" * 64,
+        }
         result = handoff.validate_handoff(payload)
         self.assertEqual(result["compatibility_status"], "COMPATIBLE")
         self.assertTrue(result["authorises_release"])
+
+    def test_current_producer_without_brand_gate_fails_closed(self):
+        payload = compatible_payload()
+        payload["producer_skill"]["version"] = "3.19.0"
+        payload["qa"]["policy_version"] = "0.8.0"
+        result = handoff.validate_handoff(payload)
+        self.assertEqual(result["compatibility_status"], "TRACKING_INCOMPLETE")
+        self.assertFalse(result["authorises_release"])
 
     def test_producer_version_mismatch_fails_closed(self):
         payload = compatible_payload()
