@@ -16,8 +16,17 @@ from datetime import datetime, timezone
 from typing import Any
 
 
-INPUT_CONTRACT = "skill-evolution-scorecard-input-v1"
-OUTPUT_CONTRACT = "skill-evolution-scorecard-v1"
+INPUT_CONTRACT = "skill-evolution-scorecard-input-v2"
+OUTPUT_CONTRACT = "skill-evolution-scorecard-v2"
+FACTOR_EVALUATION_CONTRACT = "skill-evolution-factor-evaluation-v1"
+FACTOR_DECISIONS = {
+    "REVERT_REQUIRED",
+    "SOURCE_BLOCKED",
+    "CONTINUE_OBSERVING",
+    "NO_EFFECT",
+    "EXPERIMENT_REQUIRED",
+    "PROMOTION_CANDIDATE",
+}
 
 DIAGNOSTIC_WEIGHTS = {
     "workflow_executability": 15,
@@ -65,8 +74,11 @@ def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _fingerprint(value: Any) -> str:
-    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+def _fingerprint(value: Any, omit: str | None = None) -> str:
+    material = value
+    if omit and isinstance(value, dict):
+        material = {key: item for key, item in value.items() if key != omit}
+    return hashlib.sha256(_canonical_json(material).encode("utf-8")).hexdigest()
 
 
 def _require_text(value: Any, label: str) -> str:
@@ -321,6 +333,113 @@ def _production_result(
     return result
 
 
+def _factor_evaluation_result(
+    specification: Any,
+    *,
+    change_id: str,
+    execution_id: str,
+    before_version: str,
+    after_version: str,
+    affects_traffic_decisions: bool,
+) -> dict[str, Any]:
+    if not isinstance(specification, dict):
+        raise ScorecardError("factor_evaluation must be an object")
+    path = pathlib.Path(
+        _require_text(specification.get("path"), "factor_evaluation.path")
+    )
+    expected_fingerprint = _require_text(
+        specification.get("evaluation_fingerprint"),
+        "factor_evaluation.evaluation_fingerprint",
+    )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ScorecardError(f"factor evaluation cannot be read: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ScorecardError("factor evaluation is not valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise ScorecardError("factor evaluation root must be an object")
+    if payload.get("contract_version") != FACTOR_EVALUATION_CONTRACT:
+        raise ScorecardError(
+            f"factor evaluation contract must be {FACTOR_EVALUATION_CONTRACT}"
+        )
+    actual_fingerprint = _require_text(
+        payload.get("evaluation_fingerprint"),
+        "factor evaluation artifact fingerprint",
+    )
+    if actual_fingerprint != _fingerprint(payload, omit="evaluation_fingerprint"):
+        raise ScorecardError("factor evaluation artifact fingerprint mismatch")
+    if expected_fingerprint != actual_fingerprint:
+        raise ScorecardError("factor evaluation input fingerprint mismatch")
+    identity = {
+        "change_id": change_id,
+        "execution_id": execution_id,
+        "before_version": before_version,
+        "after_version": after_version,
+    }
+    for field, expected in identity.items():
+        if payload.get(field) != expected:
+            raise ScorecardError(f"factor evaluation identity mismatch for {field}")
+    if payload.get("affects_traffic_decisions") is not affects_traffic_decisions:
+        raise ScorecardError(
+            "factor evaluation traffic-decision boundary does not match scorecard"
+        )
+    decision = payload.get("decision")
+    if decision not in FACTOR_DECISIONS:
+        raise ScorecardError("factor evaluation decision is unsupported")
+    hard_boundaries = payload.get("hard_boundaries")
+    if not isinstance(hard_boundaries, dict) or any(
+        hard_boundaries.get(key) is not False
+        for key in (
+            "may_activate_skill",
+            "may_approve_experiment",
+            "may_change_topic_score",
+            "may_create_demand",
+            "may_waive_veto",
+            "may_mutate_sanity",
+        )
+    ):
+        raise ScorecardError("factor evaluation hard boundaries are invalid")
+    activation_state = _require_text(
+        payload.get("activation_state"),
+        "factor evaluation activation_state",
+    )
+    if activation_state not in {"PROPOSED", "ACTIVE_SHADOW", "ACTIVE_PRODUCTION"}:
+        raise ScorecardError("factor evaluation activation_state is unsupported")
+    if payload.get("activation_authority") != "MANUAL_APPROVAL_REQUIRED":
+        raise ScorecardError("factor evaluation activation authority is invalid")
+    if payload.get("mutations_performed") is not False:
+        raise ScorecardError("factor evaluation must not perform mutations")
+    if not isinstance(payload.get("summary"), dict):
+        raise ScorecardError("factor evaluation summary must be an object")
+    return {
+        "path": str(path.resolve()),
+        "evaluation_fingerprint": actual_fingerprint,
+        "vector_fingerprint": _require_text(
+            payload.get("vector_fingerprint"),
+            "factor evaluation vector_fingerprint",
+        ),
+        "decision": decision,
+        "reasons": payload.get("reasons") or [],
+        "activation_state": activation_state,
+        "evaluation_window": _require_text(
+            payload.get("evaluation_window"),
+            "factor evaluation evaluation_window",
+        ),
+        "production_level": _require_text(
+            payload.get("production_level"),
+            "factor evaluation production_level",
+        ),
+        "selected_factor_count": _require_non_negative_int(
+            payload.get("selected_factor_count"),
+            "factor evaluation selected_factor_count",
+        ),
+        "summary": payload.get("summary"),
+        "activation_authority": payload.get("activation_authority"),
+        "mutations_performed": payload.get("mutations_performed"),
+    }
+
+
 def _release_decision(
     *,
     change_class: str,
@@ -328,12 +447,35 @@ def _release_decision(
     paired: dict[str, Any],
     replay: dict[str, Any],
     production: dict[str, Any],
+    factor_evaluation: dict[str, Any],
     approval_reference: str | None,
 ) -> tuple[str, list[str]]:
     reasons: list[str] = []
+    factor_decision = factor_evaluation["decision"]
+    if factor_decision == "REVERT_REQUIRED":
+        reasons.append("FACTOR_GUARDRAIL_REQUIRES_REVERT")
+        return "REVERT_REQUIRED", reasons
     if replay["gate_regressions"]:
         reasons.append("REPLAY_GATE_REGRESSION")
         return "REVERT_REQUIRED", reasons
+    if factor_decision in {"SOURCE_BLOCKED", "CONTINUE_OBSERVING"}:
+        reasons.append(
+            "FACTOR_SOURCE_BLOCKED"
+            if factor_decision == "SOURCE_BLOCKED"
+            else "FACTOR_EVIDENCE_NOT_MATURE"
+        )
+        return "PENDING_MATURITY", reasons
+    if factor_decision == "EXPERIMENT_REQUIRED":
+        reasons.append("FACTOR_EXPERIMENT_REQUIRED")
+        return "MANUAL_REVIEW", reasons
+    if factor_decision == "NO_EFFECT":
+        if factor_evaluation["activation_state"] == "ACTIVE_PRODUCTION":
+            reasons.append("ACTIVE_PRODUCTION_FACTOR_NO_EFFECT")
+            return "REVERT_REQUIRED", reasons
+        reasons.append("FACTOR_TARGETS_SHOW_NO_EFFECT")
+        return "REJECTED", reasons
+    if factor_decision != "PROMOTION_CANDIDATE":
+        raise ScorecardError("factor evaluation cannot continue to release gates")
     if diagnostic_score < 70:
         reasons.append("DIAGNOSTIC_SCORE_BELOW_70")
         return "REJECTED", reasons
@@ -410,6 +552,14 @@ def build_scorecard(data: dict[str, Any], observed_at: str | None = None) -> dic
             approval_reference_value, "approval_reference"
         )
 
+    factor_evaluation = _factor_evaluation_result(
+        data.get("factor_evaluation"),
+        change_id=change_id,
+        execution_id=execution_id,
+        before_version=before_version,
+        after_version=after_version,
+        affects_traffic_decisions=affects_traffic_decisions,
+    )
     diagnostic_score, diagnostic_dimensions = _weighted_score(
         data.get("diagnostic"), DIAGNOSTIC_WEIGHTS, "diagnostic"
     )
@@ -429,6 +579,7 @@ def build_scorecard(data: dict[str, Any], observed_at: str | None = None) -> dic
         paired=paired,
         replay=replay,
         production=production,
+        factor_evaluation=factor_evaluation,
         approval_reference=approval_reference,
     )
 
@@ -459,6 +610,7 @@ def build_scorecard(data: dict[str, Any], observed_at: str | None = None) -> dic
         },
         "paired_review": paired,
         "replay": replay,
+        "factor_evaluation": factor_evaluation,
         "production_outcome": production,
         "release": {
             "decision": decision,
@@ -474,6 +626,8 @@ def build_scorecard(data: dict[str, Any], observed_at: str | None = None) -> dic
             "ABSOLUTE_SCORE_IS_TRIAGE_ONLY",
             "SCORE_CANNOT_CREATE_DEMAND_OR_TREND_LABELS",
             "SCORE_CANNOT_WAIVE_VETO_OR_PUBLICATION_GATES",
+            "FACTOR_EVALUATION_IS_REQUIRED_FOR_NEW_SCORECARDS",
+            "FACTOR_EVALUATION_CANNOT_ACTIVATE_SKILL_OR_EXPERIMENT",
             "STRUCTURAL_ACTIVATION_REQUIRES_MANUAL_APPROVAL",
             "LOW_RISK_EXPERIMENTS_REMAIN_MANUAL_APPROVAL",
         ],

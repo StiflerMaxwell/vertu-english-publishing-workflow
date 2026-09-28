@@ -9,6 +9,11 @@ SPEC = importlib.util.spec_from_file_location("vertu_content_traffic_gate", MODU
 traffic_gate = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(traffic_gate)
+BRAND_GATE_PATH = pathlib.Path(__file__).resolve().parents[1] / "vertu_brand_mindset_gate.py"
+BRAND_SPEC = importlib.util.spec_from_file_location("vertu_brand_mindset_gate", BRAND_GATE_PATH)
+brand_gate = importlib.util.module_from_spec(BRAND_SPEC)
+assert BRAND_SPEC.loader is not None
+BRAND_SPEC.loader.exec_module(brand_gate)
 NOW_ISO = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
@@ -133,7 +138,41 @@ def realtime_snapshot(query="best travel watch movement", market="US"):
     return snapshot
 
 
-def evaluate_with_snapshot(candidate, snapshot=None):
+def brand_mindset_pass(candidate_id="travel-watch-movement-2026", core=True):
+    evidence = {
+        "audience_overlap": {
+            "status": "PASS",
+            "rationale": "Premium traveller and collector audience overlap",
+            "evidence_refs": ["artifact://brand/audience"],
+        },
+        "mindset_overlap": {
+            "status": "PASS",
+            "rationale": "Ownership, craft and premium-decision overlap",
+            "evidence_refs": ["artifact://brand/mindset"],
+        },
+        "editorial_right_to_win": {
+            "status": "PASS" if core else "FAIL",
+            "rationale": "VERTU has a credible luxury-mobile editorial perspective",
+            "evidence_refs": ["artifact://brand/right-to-win"] if core else [],
+        },
+    }
+    return brand_gate.evaluate_candidate(
+        {
+            "candidate_id": candidate_id,
+            "content_mode": "DECISION_GUIDE",
+            "brand_mindset_predeclared": True,
+            "brand_mindset_evidence": evidence,
+            "brand_conflicts": [],
+        }
+    )
+
+
+def evaluate_with_snapshot(
+    candidate,
+    snapshot=None,
+    factor_score_mode="legacy",
+    require_brand_mindset_gate=False,
+):
     snapshot = snapshot or realtime_snapshot()
     candidate["publication_run_id"] = snapshot["run_id"]
     candidate["demand_signals"][1]["metrics"]["snapshot_fingerprint"] = snapshot[
@@ -156,6 +195,8 @@ def evaluate_with_snapshot(candidate, snapshot=None):
         traffic_gate._realtime_topic_registry(snapshot),
         trend_verified,
         primary_verified,
+        factor_score_mode=factor_score_mode,
+        require_brand_mindset_gate=require_brand_mindset_gate,
     )
 
 
@@ -226,7 +267,252 @@ def d2tr_context(observed_at=NOW_ISO):
     return payload
 
 
+def direct_factor_evidence():
+    return {
+        key: {
+            "status": "AVAILABLE",
+            "raw_value": (float(spec["minimum"]) + float(spec["maximum"])) / 2,
+            "observed_at": NOW_ISO,
+            "evidence_refs": [f"artifact://direct-factor/{key}"],
+        }
+        for key, spec in traffic_gate.DIRECT_FACTOR_REGISTRY.items()
+    }
+
+
+def high_direct_factor_evidence():
+    rows = direct_factor_evidence()
+    for key, spec in traffic_gate.DIRECT_FACTOR_REGISTRY.items():
+        rows[key]["raw_value"] = (
+            float(spec["minimum"])
+            if spec["transform"] == "inverse_linear"
+            else float(spec["maximum"])
+        )
+    return rows
+
+
 class CandidateEvaluationTests(unittest.TestCase):
+    def test_required_brand_gate_fails_closed_when_missing(self):
+        result = evaluate_with_snapshot(
+            valid_candidate(), require_brand_mindset_gate=True
+        )
+        self.assertFalse(result["eligible"])
+        self.assertIn("brand_mindset_gate_invalid", result["vetoes"])
+
+    def test_required_brand_gate_pass_does_not_change_raw_score(self):
+        legacy = evaluate_with_snapshot(valid_candidate())
+        gated_candidate = valid_candidate()
+        gated_candidate["brand_mindset_gate"] = brand_mindset_pass()
+        gated = evaluate_with_snapshot(
+            gated_candidate, require_brand_mindset_gate=True
+        )
+        self.assertEqual(gated["raw_score"], legacy["raw_score"])
+        self.assertEqual(gated["demand_verdict"], legacy["demand_verdict"])
+        self.assertTrue(gated["eligible"])
+        self.assertTrue(gated["brand_mindset_gate_enforced"])
+
+    def test_rejected_brand_gate_cannot_be_rescued_by_high_score(self):
+        row = valid_candidate()
+        rejected = brand_mindset_pass()
+        rejected["verdict"] = "REJECT"
+        rejected["brand_mindset_class"] = "UNQUALIFIED"
+        rejected["brand_conflict_veto"] = ["COMMODITY_LIFESTYLE_MISMATCH"]
+        rejected["recommended_audience_fit_lane"] = None
+        rejected["fingerprint"] = brand_gate._fingerprint(rejected)
+        row["brand_mindset_gate"] = rejected
+        result = evaluate_with_snapshot(row, require_brand_mindset_gate=True)
+        self.assertGreaterEqual(result["raw_score"], 80)
+        self.assertFalse(result["eligible"])
+        self.assertIn("brand_mindset_unqualified", result["vetoes"])
+        self.assertIn("commodity_lifestyle_mismatch", result["vetoes"])
+
+    def test_direct_factor_registry_is_flat_32_and_totals_100(self):
+        self.assertEqual(len(traffic_gate.DIRECT_FACTOR_REGISTRY), 32)
+        self.assertEqual(
+            sum(
+                float(spec["weight"])
+                for spec in traffic_gate.DIRECT_FACTOR_REGISTRY.values()
+            ),
+            100.0,
+        )
+
+    def test_complete_direct_factor_evidence_gets_shadow_score(self):
+        candidate = valid_candidate(direct_factor_evidence=direct_factor_evidence())
+
+        result = evaluate_with_snapshot(candidate)
+        shadow = result["direct_factor_model"]
+
+        self.assertEqual(shadow["status"], "VALID_COMPLETE")
+        self.assertEqual(shadow["factor_count_total"], 32)
+        self.assertEqual(shadow["factor_count_available"], 32)
+        self.assertEqual(shadow["coverage_weight_pct"], 100.0)
+        self.assertTrue(shadow["diagnostic_usable"])
+        self.assertIsNotNone(shadow["coverage_normalized_score"])
+        self.assertFalse(shadow["can_change_production_decision"])
+
+    def test_direct_factor_unavailable_reduces_coverage_not_score(self):
+        evidence_rows = direct_factor_evidence()
+        key = "keyword_planner_avg_monthly_searches"
+        evidence_rows[key] = {
+            "status": "SOURCE_UNAVAILABLE",
+            "reason": "Keyword Planner unavailable for this candidate",
+            "observed_at": NOW_ISO,
+        }
+        candidate = valid_candidate(direct_factor_evidence=evidence_rows)
+
+        result = evaluate_with_snapshot(candidate)
+        shadow = result["direct_factor_model"]
+
+        self.assertEqual(shadow["factor_count_unavailable"], 1)
+        self.assertEqual(shadow["factor_count_invalid"], 0)
+        self.assertEqual(shadow["coverage_weight_pct"], 94.0)
+        self.assertEqual(
+            shadow["factors"][key]["status"], traffic_gate.SOURCE_UNAVAILABLE
+        )
+        self.assertNotIn("score_100", shadow["factors"][key])
+
+    def test_not_applicable_factor_is_excluded_from_coverage_denominator(self):
+        evidence_rows = direct_factor_evidence()
+        key = "official_trends_interest"
+        evidence_rows[key] = {
+            "status": "NOT_APPLICABLE",
+            "reason": "Evergreen candidate has no official comparison series",
+            "observed_at": NOW_ISO,
+        }
+        candidate = valid_candidate(direct_factor_evidence=evidence_rows)
+
+        result = evaluate_with_snapshot(candidate)
+        shadow = result["direct_factor_model"]
+
+        self.assertEqual(shadow["factor_count_not_applicable"], 1)
+        self.assertEqual(shadow["applicable_weight_total"], 96.0)
+        self.assertEqual(shadow["coverage_weight_pct"], 100.0)
+        self.assertEqual(shadow["status"], "VALID_COMPLETE")
+
+    def test_insufficient_sample_is_not_scored_as_zero(self):
+        evidence_rows = direct_factor_evidence()
+        key = "gsc_candidate_clicks"
+        evidence_rows[key] = {
+            "status": "INSUFFICIENT_SAMPLE",
+            "reason": "Newest finalised query window has no returned rows",
+            "observed_at": NOW_ISO,
+            "raw_value": 0,
+            "evidence_refs": ["artifact://gsc/query"],
+        }
+        candidate = valid_candidate(direct_factor_evidence=evidence_rows)
+
+        result = evaluate_with_snapshot(candidate)
+        shadow = result["direct_factor_model"]
+
+        self.assertEqual(shadow["factor_count_insufficient_sample"], 1)
+        self.assertEqual(shadow["coverage_weight_pct"], 96.0)
+        self.assertNotIn("score_100", shadow["factors"][key])
+        self.assertEqual(shadow["factors"][key]["raw_value"], 0)
+
+    def test_direct_factor_rejects_hand_authored_normalised_score(self):
+        evidence_rows = direct_factor_evidence()
+        key = "original_value_checks_passed"
+        evidence_rows[key]["score_100"] = 100
+        candidate = valid_candidate(direct_factor_evidence=evidence_rows)
+
+        result = evaluate_with_snapshot(candidate)
+        shadow = result["direct_factor_model"]
+
+        self.assertEqual(shadow["status"], "INVALID")
+        self.assertIn(
+            f"hand_authored_factor_score:{key}", shadow["validation_errors"]
+        )
+        self.assertTrue(result["eligible"])
+
+    def test_direct_factor_shadow_cannot_change_production_decision(self):
+        baseline = evaluate_with_snapshot(valid_candidate())
+        with_shadow = evaluate_with_snapshot(
+            valid_candidate(direct_factor_evidence=direct_factor_evidence())
+        )
+
+        self.assertEqual(with_shadow["score"], baseline["score"])
+        self.assertEqual(with_shadow["raw_score"], baseline["raw_score"])
+        self.assertEqual(with_shadow["eligible"], baseline["eligible"])
+        self.assertEqual(with_shadow["demand_verdict"], baseline["demand_verdict"])
+        self.assertEqual(with_shadow["vetoes"], baseline["vetoes"])
+        self.assertFalse(with_shadow["direct_factor_can_change_eligibility"])
+
+    def test_hybrid_trial_uses_exact_80_20_formula(self):
+        candidate = valid_candidate(
+            direct_factor_evidence=high_direct_factor_evidence()
+        )
+
+        result = evaluate_with_snapshot(
+            candidate, factor_score_mode="hybrid_trial"
+        )
+        component = result["hybrid_factor_component"]
+        expected = round(
+            result["legacy_score"] * traffic_gate.HYBRID_LEGACY_WEIGHT
+            + component["effective_factor_score"]
+            * traffic_gate.HYBRID_FACTOR_WEIGHT,
+            2,
+        )
+
+        self.assertTrue(component["ready"])
+        self.assertEqual(result["hybrid_score"], expected)
+        self.assertEqual(result["score"], expected)
+        self.assertEqual(result["score_source"], traffic_gate.HYBRID_SCORE_SOURCE)
+        self.assertTrue(result["direct_factor_can_change_eligibility"])
+
+    def test_hybrid_trial_blocks_sparse_factor_evidence(self):
+        rows = {
+            key: {
+                "status": traffic_gate.SOURCE_UNAVAILABLE,
+                "reason": "not returned for controlled test",
+                "observed_at": NOW_ISO,
+            }
+            for key in traffic_gate.DIRECT_FACTOR_REGISTRY
+        }
+        rows["demand_provider_family_count"] = direct_factor_evidence()[
+            "demand_provider_family_count"
+        ]
+        candidate = valid_candidate(direct_factor_evidence=rows)
+
+        result = evaluate_with_snapshot(
+            candidate, factor_score_mode="hybrid_trial"
+        )
+
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["score_status"], "FACTOR_EVIDENCE_BLOCKED")
+        self.assertIn("insufficient_direct_factor_coverage", result["vetoes"])
+        self.assertIsNone(result["hybrid_score"])
+
+    def test_hybrid_trial_blocks_missing_core_factor(self):
+        rows = high_direct_factor_evidence()
+        key = "cannibalisation_safety"
+        rows[key] = {
+            "status": traffic_gate.SOURCE_UNAVAILABLE,
+            "reason": "live inventory was unavailable",
+            "observed_at": NOW_ISO,
+        }
+        candidate = valid_candidate(direct_factor_evidence=rows)
+
+        result = evaluate_with_snapshot(
+            candidate, factor_score_mode="hybrid_trial"
+        )
+
+        self.assertFalse(result["eligible"])
+        self.assertIn(f"missing_core_direct_factor:{key}", result["vetoes"])
+
+    def test_hybrid_factor_score_cannot_create_independent_demand(self):
+        candidate = valid_candidate(
+            direct_factor_evidence=high_direct_factor_evidence()
+        )
+        candidate["demand_signals"][1]["positive"] = False
+
+        result = evaluate_with_snapshot(
+            candidate, factor_score_mode="hybrid_trial"
+        )
+
+        self.assertGreaterEqual(result["hybrid_score"], traffic_gate.PASSING_SCORE)
+        self.assertFalse(result["eligible"])
+        self.assertEqual(result["demand_verdict"], "REJECT")
+        self.assertIn("insufficient_independent_demand_signals", result["vetoes"])
+
     def test_valid_search_candidate_gets_computed_score_and_passes(self):
         result = evaluate_with_snapshot(valid_candidate())
 

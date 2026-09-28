@@ -1,15 +1,21 @@
 version = 1
 id = "vertu-10-template"
 kind = "heartbeat"
-name = "VERTU English content portfolio"
+name = "VERTU daily five — creator draft template"
 prompt = """
 Run the canonical VERTU English publishing pipeline in Discover-first
 auto_discovery mode.
 
+Read docs/CURRENT-OPERATING-PROFILE.md first. This public five-count example
+overrides historical ten-count wording for quantity only, without importing
+any upstream standing approval. This template remains inactive and draft-only;
+its five-count target is draft delivery, not authority to publish five articles.
+
 Configuration:
 - source_window_hours: 72 plus durable evergreen demand
 - candidate_target: at least 30; cumulative targets: 60, 90, 120
-- required_publish_count: 10; max_articles: 10; minimum_articles: 10
+- target_article_count: 5; max_articles: 5; minimum_articles: 0
+- required_publish_count: 0 (draft-only template)
 - target_outcome: discover_and_search
 - trend_mode: realtime_hot
 - trend_markets: US, GB, AU, CA, AE, SA, SG, HK, IN
@@ -31,6 +37,8 @@ Before acting:
 Traffic and intelligence gates:
 - Query finalised 365-day and recent 28-day GSC Discover/Search evidence.
 - Consume the latest successful editorial-intelligence upstream.
+- Collect official or reproducible YouTube topic signals before scoring and
+  keep them shadow-only with zero demand, trend-label, score or veto authority.
 - Fetch official Google Trends Trending Now evidence for configured markets.
 - Validate durable and provisional learning priors before scoring.
 - Score every expansion round with `score_source=computed_v3_12_0`.
@@ -39,9 +47,13 @@ Traffic and intelligence gates:
   impressions; preserve smaller samples as AVAILABLE/INSUFFICIENT_SAMPLE.
 - Select only demand-qualified candidates with score >=80, no hard veto and a
   pre-draft Discover forecast PASS. Expand cumulatively and replace downstream
-  blockers until ten articles complete or the bounded supply is exhausted.
+  blockers within the documented two-phase bounded supply; draft-only delivery
+  must not be labelled as published success.
+- After production selection, run an exact-query SERP benchmark before research
+  or writing. Only BENCHMARK_PASS continues; reframe returns to scoring and a
+  blocked or non-original direction requires a distinct replacement.
 - Quota pressure may never lower evidence, score, diversity, QA, image, author,
-  link, live or handoff gates. Exhaustion below ten is DAILY_QUOTA_BLOCKED.
+  link, live or handoff gates. Report fewer than five drafts as a shortfall.
 
 Permanent routing boundary:
 - Never assign, draft, stage, sync or publish automatic content to news or a
@@ -51,15 +63,23 @@ Article gates:
 - Research current primary sources and live CMS inventory before outlining.
 - Fetch current product knowledge when product, service, privacy, craft, price,
   availability, health or capability context is relevant.
-- Produce at least 1,500 substantive words unless a shorter complete treatment
-  is explicitly permitted; never pad.
+- Match depth to the reader's question; use the canonical article-type ranges
+  as guidance, never as a padding target.
 - Include one article-specific value object and reader-visible evidence.
 - Require contextual internal links and authoritative external evidence.
 - Run the human editorial pass, independent SEO QA and Discover readiness.
-- Use producer 3.14.0 with independent QA 0.7.1 through `qa-handoff-v1`.
+- Use producer 3.20.0 with independent QA 0.8.0 through `qa-handoff-v1`.
+- Require a fingerprint-valid brand-mindset PASS before deterministic scoring.
+- Save quality-review.md from an independent substantive editor before QA.
+- Reconcile today's published inventory and ledger before any authorised
+  production recovery; manual recovery counts toward the total daily five.
+- Bind the three SERP benchmark artifacts and exact fingerprint into the QA
+  bundle; SERP_DIFFERENTIATION_MISMATCH is a required FIX.
 - Reject duplicate brand/concierge integration sections and materially repeated
   batch heading fingerprints. Treat BODY_VISUAL_MISSING as warning-only.
-- Generate an article-specific 16:9 hero only after both gates pass.
+- Prefer rights-cleared official product photographs where suitable; no fake
+  product configurations. Appropriate non-literal concepts use authorised
+  image_gen only after QA and Discover pass; preserve WAITING_FOR_IMAGE.
 - Use only configured institutional author IDs selected by expertise.
 
 Publication and handoff:
@@ -73,6 +93,9 @@ Publication and handoff:
   authorship/schema and rendered-link reconciliation after publication.
 - Write the article, publication run and exact-revision QA handoff to the
   configured Base tables and register 24h/72h/7d/28d monitoring checkpoints.
+- After live handoff, route due 72h/7d/28d LLM visibility checks to the separate
+  read-only diagnostic automation. A missing citation is not non-indexation and
+  cannot directly authorise repair, scoring or Skill changes.
 - Release only the exact local scopes owned by this execution. Preserve runtime
   acquire/release receipts and report RELEASE_INCOMPLETE as HANDOFF_INCOMPLETE.
 

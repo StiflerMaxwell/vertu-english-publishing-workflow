@@ -53,6 +53,7 @@ function readPositiveInteger(value: string | undefined, fallback: number) {
 }
 
 function readKeychainSecret(appId: string) {
+  if (!appId) return null;
   if (process.platform !== "darwin") return null;
   try {
     const value = execFileSync(

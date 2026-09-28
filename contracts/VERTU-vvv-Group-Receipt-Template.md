@@ -5,9 +5,7 @@
 唯一群通知通道：
 
 - provider：`vvv_user_robot`
-- app ID：`VERTU_VVV_APP_ID`
-- channel ID：`VERTU_VVV_CHANNEL_ID`
-- endpoint：`VERTU_VVV_PUSH_ENDPOINT`
+- channel ID：`${VERTU_VVV_CHANNEL_ID}`
 - sender：`scripts/vertu-vvv-notify.ts`
 
 禁止使用旧微信网关、`WECHAT_*` 配置、群名称路由或昵称路由。App Secret

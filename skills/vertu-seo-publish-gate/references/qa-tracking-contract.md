@@ -6,15 +6,16 @@
 - Base name: `VERTU 内容与 SEO 运营闭环`
 - Base token: `${FEISHU_BASE_TOKEN}`
 - QA Runs table: `${FEISHU_QA_RUNS_TABLE_ID}`
-- Findings table: `${FEISHU_QA_FINDINGS_TABLE_ID}`
+- Findings table: `${FEISHU_FINDINGS_TABLE_ID}`
 - Skill Change Log table: `${FEISHU_SKILL_CHANGE_LOG_TABLE_ID}`
-- Content review table: `${FEISHU_CONTENT_REVIEW_TABLE_ID}`
+- Content review table: `${FEISHU_CHECKPOINTS_TABLE_ID}`
 - Publication runs table: `${FEISHU_PUBLICATION_RUNS_TABLE_ID}`
-- Any former QA tracker configured as an archive is read-only. Automated QA and repair execution must not write there.
+- Historical trackers are read-only archives. Operators must supply their own
+  current canonical tracker; this package contains no archive identifiers.
 
 ## QA Runs Write Contract
 
-Shared production/QA identity contract: `${VERTU_PDCA_ROOT}/contracts/VERTU-QA-Handoff-Contract.md` (`qa-handoff-v1`). Component versions remain independent; Base records their compatibility.
+Shared production/QA identity contract: `${VERTU_PDCA_ROOT}/docs/03-运行/VERTU-QA-Handoff-Contract.md` (`qa-handoff-v1`). Component versions remain independent; Base records their compatibility.
 
 Create one new record per source revision and review round. Required fields:
 
@@ -33,6 +34,8 @@ Create one new record per source revision and review round. Required fields:
 - `Publication Run ID`
 - `Article Key`
 - `Draft Bundle SHA256`
+- `SERP Benchmark Fingerprint`
+- `Original Value Delta`
 - `Source Identity Type`
 - `Release Gate Role`
 - `Compatibility Status`
@@ -70,7 +73,7 @@ Do not overwrite an earlier QA Run when the content or `_rev` changes.
 Identity contract:
 
 - New QA identity key: `Sanity Doc ID + Source Rev + QA Policy Hash + Evaluation Profile`.
-- Compute `QA Policy Hash` from the ordered stable labels and bytes of `SKILL.md`, `references/qa-tracking-contract.md`, `scripts/vertu_qa_policy.py`, `scripts/vertu_editorial_safeguards.py`, and `contracts/VERTU-QA-Handoff-Contract.md`. Absolute workspace paths must not affect the hash.
+- Compute `QA Policy Hash` from the ordered stable labels and bytes of `SKILL.md`, `references/qa-tracking-contract.md`, `scripts/vertu_qa_policy.py`, `scripts/vertu_editorial_safeguards.py`, and `docs/03-运行/VERTU-QA-Handoff-Contract.md`. Absolute workspace paths must not affect the hash.
 - `Skill Version` remains reader-facing lineage but is not sufficient for deterministic identity.
 - Historical rows whose exact policy bytes/profile cannot be proven use `LEGACY_POLICY_UNVERIFIED`; do not invent a current hash for them.
 - Duplicate historical `QA Run ID` values use `DUPLICATE_QA_RUN_ID`; preserve every row and decision.
@@ -82,7 +85,7 @@ Identity contract:
 
 Create one record per finding and link it through `关联 QA Run`. Required fields:
 
-Deterministic editorial safeguard Findings use the stable categories `DUPLICATE_VERTU_CONCIERGE_INTEGRATION`, `TEMPLATE_DEPENDENT_DRAFT`, and `BODY_VISUAL_MISSING`. The first two are `必修` and remain release-blocking until a changed source revision receives a new PASS. `BODY_VISUAL_MISSING` is `建议` and non-blocking during the first-phase measurement window.
+Deterministic editorial safeguard Findings use the stable categories `DUPLICATE_VERTU_CONCIERGE_INTEGRATION`, `TEMPLATE_DEPENDENT_DRAFT`, `BODY_VISUAL_MISSING`, and `SERP_DIFFERENTIATION_MISMATCH`. The first, second and fourth are `必修` and remain release-blocking until a changed source revision receives a new PASS. `BODY_VISUAL_MISSING` is `建议` and non-blocking during the first-phase measurement window.
 
 - `Patch ID`
 - `QA Run ID`

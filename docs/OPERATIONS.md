@@ -1,5 +1,9 @@
 # Operations
 
+Read [the current five-article profile](CURRENT-OPERATING-PROFILE.md) and
+[creator SOP](CONTENT-CREATOR-HANDOFF.zh-CN.md) first. Public examples are inactive
+and draft-only; credentials and standing production authority are not included.
+
 ## Pre-run
 
 - validate the canonical Base schema map against live tables;
@@ -14,7 +18,7 @@
 ## Safe local checks
 
 ```bash
-python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+python3 -m pytest scripts/tests skills/vertu-seo-publish-gate/tests --import-mode=importlib
 python3 scripts/validate_bundle.py
 python3 scripts/vertu_google_trends_realtime.py --help
 python3 scripts/vertu_content_traffic_gate.py --help

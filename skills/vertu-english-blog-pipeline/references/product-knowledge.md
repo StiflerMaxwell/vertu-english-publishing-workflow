@@ -17,7 +17,7 @@ Use user identity for user-owned Feishu resources.
 ```bash
 lark-cli schema wiki.spaces.get_node
 lark-cli wiki spaces get_node \
-  --params '{"token":"FMgPwM0kFi0sIzkSpkLc4QYsnKq"}' \
+  --params "$(jq -nc --arg token "$FEISHU_PRODUCT_KB_WIKI_TOKEN" '{token:$token}')" \
   --as user
 
 lark-cli docs +fetch --doc "<resolved_obj_token>" --as user
@@ -71,7 +71,7 @@ Create `product-context.json`:
 ```json
 {
   "knowledge_base": {
-    "wiki_token": "FMgPwM0kFi0sIzkSpkLc4QYsnKq",
+    "wiki_token": "${FEISHU_PRODUCT_KB_WIKI_TOKEN}",
     "revision_id": null,
     "edited_at": null,
     "fetched_at": null

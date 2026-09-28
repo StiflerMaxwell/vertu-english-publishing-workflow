@@ -16,7 +16,7 @@ This is the shared source of truth between the VERTU English producer, the indep
 
 Component versions are intentionally independent. Matching version numbers are not required; a compatible handoff contract and exact policy identity are required.
 
-Current verified pair after the 2026-08-24 runtime-governance release: producer `3.14.0`, QA `0.7.1`, handoff `qa-handoff-v1`. Older versions inside the compatible ranges remain valid only for their exact historical policy and source identity.
+Current verified pair after the 2026-08-31 brand-mindset eligibility alignment: producer `3.19.0`, QA `0.8.0`, handoff `qa-handoff-v1`. Older versions inside the compatible ranges remain valid only for their exact historical policy and source identity.
 
 ## Required identity
 
@@ -24,7 +24,9 @@ Every new handoff records:
 
 - `publication_run_id`, `article_key`, canonical URL, non-News section, language and markets;
 - producer Skill ID and version;
-- `draft_bundle_sha256` over the reviewed `article.md`, `seo.json`, `claim-ledger.json`, `link-plan.json`, `evidence-pack.md`, `product-context.json` and `editorial-changes.md`, with explicit absent statuses where the production contract permits absence;
+- `draft_bundle_sha256` over the reviewed `article.md`, `seo.json`, `claim-ledger.json`, `link-plan.json`, `evidence-pack.md`, `product-context.json`, `editorial-changes.md`, `brand-mindset-candidates.json`, `brand-mindset-summary.json`, `serp-benchmark.json`, `ranking-page-anatomy.json` and `content-differentiation-brief.md`, with explicit absent statuses only where the production contract permits absence;
+- for producer `>=3.18.0`, `serp_benchmark_contract_version=serp-benchmark-v1`, verdict `BENCHMARK_PASS`, exact benchmark fingerprint and the declared original-value delta;
+- for producer `>=3.19.0`, `brand_mindset_gate.contract_version=brand-mindset-fit-v1`, verdict `PASS`, class `CORE_MINDSPACE | QUALIFIED_ADJACENT` and its exact result fingerprint;
 - source identity type and exact Sanity document/revision when present;
 - immutable QA Run ID and canonical Base QA record ID;
 - QA policy ID, version, workspace-independent hash and evaluation profile;
@@ -62,6 +64,11 @@ New QA Runs persist:
 - `Publication Run ID`
 - `Article Key`
 - `Draft Bundle SHA256`
+- `SERP Benchmark Fingerprint`
+- `Original Value Delta`
+- `Brand Mindset Contract Version`
+- `Brand Mindset Class`
+- `Brand Mindset Fingerprint`
 - `Source Identity Type`
 - `Release Gate Role`
 - `Compatibility Status`

@@ -10,14 +10,16 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import pathlib
 import re
+import sys
 from typing import Any, Iterable
 
 
 POLICY_ID = "vertu-seo-publish-gate"
-POLICY_VERSION = "0.7.1"
+POLICY_VERSION = "0.8.0"
 DEFAULT_EVALUATION_PROFILE = "official_site_standard"
 
 EVALUATION_PROFILES = {
@@ -197,6 +199,89 @@ def canonical_policy_hash(*paths: str | pathlib.Path) -> str:
     return digest.hexdigest()
 
 
+def canonical_policy_sources() -> tuple[pathlib.Path, ...]:
+    root = pathlib.Path(__file__).resolve().parents[1]
+    # The public handoff package must validate its own exact policy sources,
+    # not silently read another installation from the recipient's home folder.
+    for package_root in (root, *root.parents):
+        if (package_root / ".public-workflow-package").is_file():
+            skill = package_root / "skills/vertu-seo-publish-gate"
+            return (
+                skill / "SKILL.md", skill / "references/qa-tracking-contract.md",
+                package_root / "scripts/vertu_qa_policy.py",
+                skill / "scripts/vertu_editorial_safeguards.py",
+                package_root / "contracts/VERTU-QA-Handoff-Contract.md",
+            )
+    skill = pathlib.Path.home() / ".openclaw/workspace/skills/vertu-seo-publish-gate"
+    return (
+        skill / "SKILL.md", skill / "references/qa-tracking-contract.md",
+        pathlib.Path(__file__).resolve(), skill / "scripts/vertu_editorial_safeguards.py",
+        root / "docs/03-运行/VERTU-QA-Handoff-Contract.md",
+    )
+
+
+def current_policy_identity() -> dict[str, str]:
+    sources = canonical_policy_sources()
+    declared = re.search(r'Current policy version: `([^`]+)`', sources[0].read_text())
+    if not declared or declared.group(1) != POLICY_VERSION:
+        raise QAPolicyError("QA_POLICY_VERSION_MISMATCH")
+    return {"qa_policy_id": POLICY_ID, "qa_policy_version": POLICY_VERSION,
+            "qa_policy_hash": canonical_policy_hash(*sources)}
+
+
+def check_runtime() -> dict[str, Any]:
+    """Execute real safeguard probes; this is NOT article QA or release approval."""
+    identity = current_policy_identity()
+    path = canonical_policy_sources()[3]
+    spec = importlib.util.spec_from_file_location("_vertu_current_safeguards", path)
+    if spec is None or spec.loader is None:
+        raise QAPolicyError("QA_RUNTIME_CHECK_FAILED: safeguard loader unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+        benchmark = {"contract_version": "serp-benchmark-v1", "verdict": "BENCHMARK_PASS",
+                     "original_value_delta": "Compare cabin upgrade refund restrictions",
+                     "required_value_object_types": ["comparison_table"]}
+        benchmark["benchmark_fingerprint"] = module._benchmark_fingerprint(benchmark)
+        body = "# Cabin upgrade\n\nCabin upgrade refund restrictions differ.\n\n| Cabin | Refund |\n| --- | --- |\n| Business | Fare dependent |\n"
+        good = module.evaluate_article(article_key="probe", content=body, content_type="guide",
+                                       serp_benchmark=benchmark, require_serp_benchmark=True)
+        missing = module.evaluate_article(article_key="probe", content=body, content_type="guide",
+                                          require_serp_benchmark=True)
+        changed = dict(benchmark, original_value_delta="Unrelated camera comparison")
+        tampered = module.serp_differentiation_evaluation(body, benchmark=changed, required=True)
+        duplicate = module.duplicate_integration_evaluation(
+            "## How VERTU helps\nA.\n## VERTU Concierge for travellers\nB.")
+        repeated = "# Comparison\n" + "\n".join(
+            "## " + heading + "\nSpecific evidence."
+            for heading in ("Cabin upgrade eligibility", "Refund restrictions compared",
+                            "Seat booking conditions", "Baggage purchase decisions",
+                            "Change fee calculation", "Airport lounge admission"))
+        batch = module.evaluate_batch([
+            {"article_key": key, "content": repeated, "content_type": "guide"}
+            for key in ("probe-a", "probe-b")])
+        visual = module.evaluate_article(article_key="probe", content=body + " evidence" * 1550,
+                                         content_type="buying_guide", title="Best cabin comparison")
+        checks = {
+            "serp_positive": good["preflight_pass"],
+            "serp_missing_blocks": "SERP_DIFFERENTIATION_MISMATCH" in missing["blocking_codes"],
+            "serp_tampered_blocks": tampered["blocking"],
+            "duplicate_integration_blocks": bool(duplicate.get("finding")),
+            "batch_template_blocks": batch["template_dependent_pair_count"] == 1,
+            "body_visual_warning_only": "BODY_VISUAL_MISSING" in visual["warning_codes"] and visual["preflight_pass"],
+            "medical_affirmation_blocks": classify_restricted_context("This device can treat hypertension.", "treat")["auto_block"],
+            "nonmedical_idiom_preserved": not classify_restricted_context("Treat the offer as a new transaction.", "treat")["auto_block"],
+        }
+    finally:
+        sys.modules.pop(spec.name, None)
+    passed = all(checks.values())
+    return {**identity, "contract_version": "qa-runtime-compatibility-v1",
+            "verdict": "PASS" if passed else "BLOCK", "checks": checks,
+            "blocker": None if passed else "QA_RUNTIME_CHECK_FAILED",
+            "startup_compatible": passed, "authorises_release": False}
+
+
 def build_qa_identity(
     *,
     sanity_doc_id: str,
@@ -361,6 +446,10 @@ def main() -> int:
     policy_hash = subparsers.add_parser("policy-hash")
     policy_hash.add_argument("--source", action="append", required=True)
 
+    runtime = subparsers.add_parser("runtime-check")
+    runtime.add_argument("--execution-id", required=True)
+    runtime.add_argument("--output")
+
     args = parser.parse_args()
     if args.command == "identity":
         result = build_qa_identity(
@@ -371,6 +460,18 @@ def main() -> int:
         )
     elif args.command == "restricted-context":
         result = classify_restricted_context(args.text, args.term)
+    elif args.command == "runtime-check":
+        try:
+            result = check_runtime()
+        except (OSError, QAPolicyError, ValueError, AttributeError, KeyError) as exc:
+            result = {"verdict": "BLOCK", "startup_compatible": False,
+                      "authorises_release": False, "blocker": "QA_RUNTIME_CHECK_FAILED",
+                      "reason": str(exc)}
+        result["execution_id"] = args.execution_id
+        if args.output:
+            pathlib.Path(args.output).write_text(json.dumps(result, indent=2) + "\n")
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0 if result["startup_compatible"] else 2
     else:
         result = {
             "qa_policy_id": POLICY_ID,

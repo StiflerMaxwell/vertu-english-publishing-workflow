@@ -110,7 +110,7 @@ The job must:
 - replay proposed priors against historical candidate portfolios;
 - reject any proposal that lowers gate compliance, portfolio diversity or holdout quality;
 - write `NO_PROMOTION` when neither a provisional nor durable rule qualifies, write `NO_DURABLE_LESSON` when only provisional evidence qualifies, and preserve the last valid durable `ACTIVE` pointer unchanged;
-- write one canonical Base `自动化运行日志` row and one `Skill Change Log` row per proposed, activated, expired, rejected or rolled-back change.
+- write one canonical Base `自动化运行日志` row and one `Skill 学习与进化` row per proposed, activated, expired, rejected or rolled-back change.
 
 ## Twice-daily skill release
 
@@ -121,16 +121,18 @@ On every twice-daily run:
 3. expire or roll back reversed priors;
 4. consolidate repeated structural proposals;
 5. run scorer tests, skill validation and a historical replay;
-6. for every material Skill or governing-process proposal, build `skill-scorecard-input.json` and run `scripts/vertu_skill_evolution_scorecard.py` under `skill-evolution-scorecard.md`;
-7. treat its structural diagnostic as triage only, require same-rubric paired comparison for keep/revert, and require mature D+28 or verified-experiment production outcomes for traffic-affecting promotion;
-8. bump the patch version only for material data/wording/process changes that pass all checks, or the minor version for an explicitly approved contract change;
-9. record old rule, new rule, evidence, scorecard fingerprint and decision, replay result, implementation time, active skill version and rollback condition in `Skill Change Log`.
+6. before reading proposal outcomes, write `skill-evolution-factor-input.json` with predeclared target factors, guardrail factors, expected directions and maturity windows, then generate all 60 rows in `skill-evolution-factors.json` under `skill-evolution-factor-vector.md`;
+7. bind an exact `skill-evolution-factor-evaluation-input.json` to that vector and run `scripts/vertu_skill_evolution_factor_evaluator.py`; preserve the evaluation decision, fingerprint and selected-factor results;
+8. for every material Skill or governing-process proposal, build `skill-scorecard-input.json` under v2 and run `scripts/vertu_skill_evolution_scorecard.py`; only an exact `PROMOTION_CANDIDATE` factor evaluation may continue through the scorecard;
+9. treat the structural diagnostic as triage only, require same-rubric paired comparison for keep/revert, and require mature D+28 or verified-experiment production outcomes for traffic-affecting promotion;
+10. bump the patch version only for material data/wording/process changes that pass all checks, or the minor version for an explicitly approved contract change;
+11. record old rule, new rule, evidence, factor-vector/evaluation/scorecard fingerprints and decisions, replay result, implementation time, active Skill version and rollback condition in `Skill 学习与进化`, with immutable factor rows in `Skill 进化因子观测`.
 
 If no material and replay-safe change qualifies, preserve the current Skill version and record `NO_SKILL_CHANGE`; never create a cosmetic version bump. Data-only provisional or durable priors and non-structural operational clarifications may activate automatically when every deterministic gate passes. Structural changes to rubric weights, thresholds, vetoes, source authority, publication authority or QA boundaries remain proposals until explicitly approved.
 
 ## Canonical Base
 
-Use only `VERTU 内容与 SEO 运营闭环`, table `Skill Change Log` (`${VERTU_SKILL_CHANGE_LOG_TABLE_ID}`).
+Use only `VERTU SEO 全流程治理与 Skill 自进化`. Keep change-level summaries in `Skill 学习与进化` (`CONFIGURE_TBL`, formerly `Skill Change Log`) and factor-level immutable observations in `Skill 进化因子观测`.
 
 Record:
 
@@ -142,7 +144,11 @@ Record:
 - replay result;
 - structural diagnostic score, paired verdict, production outcome score and release decision;
 - scorecard fingerprint and immutable local scorecard path;
+- factor-vector fingerprint and immutable local factor-vector path;
+- factor-evaluation fingerprint, decision and immutable local evaluation path;
 - state: proposed, accepted, implemented or rejected;
 - skill version, activation time, expiry and rollback condition.
 
 Never overwrite historical change records. Use a new Change ID for a revised proposal or rollback.
+
+Never flatten the 60 factors into one total or 60 sparse columns on `Skill 学习与进化`. One normalised observation row represents one factor, change, execution and vector fingerprint. Unavailable factor values remain null with their explicit state.

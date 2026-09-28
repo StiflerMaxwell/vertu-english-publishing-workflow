@@ -31,7 +31,7 @@ def manifest(**overrides):
         "limits": {
             "max_runtime_seconds": 14400,
             "max_child_tasks": 12,
-            "max_candidates": 120,
+            "max_candidates": 240,
             "max_attempts_per_scope": 3,
         },
         "usage": {"runtime_seconds": 60, "child_tasks": 0, "candidates": 30},
@@ -117,7 +117,7 @@ class LoopRuntimeTests(unittest.TestCase):
             root = pathlib.Path(temp)
             state, locks, pause = self.paths(root)
             result = runtime.acquire(
-                manifest(usage={"runtime_seconds": 60, "child_tasks": 0, "candidates": 120}),
+                manifest(usage={"runtime_seconds": 60, "child_tasks": 0, "candidates": 240}),
                 state_path=state,
                 locks_dir=locks,
                 pause_file=pause,

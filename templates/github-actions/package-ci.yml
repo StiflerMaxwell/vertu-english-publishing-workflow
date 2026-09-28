@@ -26,13 +26,8 @@ jobs:
           version: "11.9.0"
 
       - run: pnpm install --frozen-lockfile
-      - run: python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+      - run: python3 -m pip install -r requirements-dev.txt
+      - run: python3 -m pytest scripts/tests skills/vertu-seo-publish-gate/tests --import-mode=importlib
       - run: python3 scripts/validate_bundle.py
-
-      - name: Notification preview
-        run: |
-          printf '%s\n' 'CI preview only' > /tmp/vvv-message.txt
-          pnpm notify:preview -- \
-            --body-file /tmp/vvv-message.txt \
-            --receipt-file /tmp/vvv-preview.json
-          node -e 'const r=require("/tmp/vvv-preview.json"); if(r.status!=="PREVIEW") process.exit(1)'
+      - run: pnpm test:notification
+      - run: sha256sum -c MANIFEST.sha256

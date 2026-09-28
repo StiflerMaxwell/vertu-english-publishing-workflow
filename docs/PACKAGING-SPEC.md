@@ -8,8 +8,8 @@ tenant identifiers, private run artifacts or machine-specific session state.
 
 ## Included
 
-- canonical editorial Skill v3.14.0 and every active reference;
-- independent SEO QA Skill v0.7.1 and its tracking contract;
+- sanitised editorial Skill v3.20.0 and every active reference;
+- independent SEO QA Skill v0.8.0 and its tracking contract;
 - deterministic demand scoring, realtime Trends, monitoring handoff,
   QA-identity, daily quota, local loop runtime, Skill scorecard and
   learning-flywheel scripts;
@@ -18,6 +18,11 @@ tenant identifiers, private run artifacts or machine-specific session state.
 - chain, monitoring and vvv receipt contracts;
 - canonical Base schema-map example;
 - installation, operations and security documentation.
+
+This is a separately sanitised edition, not a byte-identical canonical snapshot.
+The current public profile documents the daily-five example separately from
+historical ten-count source wording. Live approval never transfers with it.
+Package-local QA source resolution has its own freshly computed policy hash.
 
 ## Excluded
 

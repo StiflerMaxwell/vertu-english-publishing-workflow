@@ -1,4 +1,4 @@
-# Traffic Demand Gate — v3.14.0
+# Traffic Demand Gate — v3.20.0
 
 Use this contract before selecting or drafting an article. Its purpose is to prove that a candidate has a plausible Search or Discover acquisition path. It does not promise ranking or recommendation.
 
@@ -10,17 +10,19 @@ Every serious candidate must record:
 - each demand provider's status, observation window, fetch time, evidence reference, metrics, normalised score, and positive/negative interpretation;
 - historical VERTU/GSC fit, trend velocity or timeliness, SERP gap, Discover story, original information gain, and VERTU right-to-win evidence;
 - existing inventory overlap, cannibalisation risk, query boundary, cluster role, outbound internal destination, and inbound-link candidates;
+- raw `direct_factor_evidence` for all 32 shadow factors, emitted by the central extractor with explicit available, source-unavailable, insufficient-sample and not-applicable states;
 - vetoes, validation errors, computed score, demand verdict, and selection verdict.
+- a fingerprint-valid `brand-mindset-fit-v1` result with `PASS`, `CORE_MINDSPACE | QUALIFIED_ADJACENT`, matched dimensions, rationale, evidence references, conflicts and expansion round.
 - one trend class from `REALTIME_HOT | RISING_SEARCH | EVERGREEN_SEARCH`, target markets and the evidence required by `realtime-trends.md`.
 - one separate editorial signal from `EDITORIAL_BREAKOUT | CURRENT_CONFIRMED | NONE`, with the evidence required by `editorial-intelligence.md`.
 - one audience-fit lane from `PREMIUM_DECISION_CORE | ADJACENT | EXPLORATION_CANDIDATE`; promote `EXPLORATION_CANDIDATE` to `EXPLORATION` only after the normal demand gate passes. Record mass recognisability, concrete decision intent, finalised historical cluster evidence and niche risk.
 - optional `d2tr_context` with an exact market and explicit topic-category, editorial-format-group, format-type or content-category mapping. This independent context is never a Search-demand provider and never creates a Google trend class.
 
-Allowed source states are `AVAILABLE` and `SOURCE_UNAVAILABLE`. An unavailable source requires a reason and fetch time. Never replace an unavailable metric with zero.
+Demand-provider source states remain governed by their source contracts. Direct-factor source states are `AVAILABLE | SOURCE_UNAVAILABLE | INSUFFICIENT_SAMPLE | NOT_APPLICABLE`; every non-available factor requires a reason and observation time. Never replace an unavailable metric with zero.
 
 ## Minimum demand rules
 
-- `Search-first`: require at least two independent positive providers from different acquisition evidence systems. Accepted providers are candidate-level finalised GSC query/page evidence, official Google Trends comparison evidence, and authorised Google Ads Keyword Planner evidence. SERP observations, editorial/social velocity, primary-source recency and broad historical cluster adjacency are supporting evidence, not Search-demand providers.
+- `Search-first`: require at least two independent positive providers from different acquisition evidence systems. Accepted providers are candidate-level finalised GSC query/page evidence, official Google Trends comparison evidence, and authorised Google Ads Keyword Planner evidence. SERP observations, editorial/social/YouTube velocity, primary-source recency and broad historical cluster adjacency are supporting evidence, not Search-demand providers.
 - `Discover-first`: require a current-interest provider, historical VERTU cluster evidence, and a concrete feed-readable visual story.
 - `Authority-first`: require at least one positive traffic provider and use `TEST`, not `STRONG`; limit authority/exploration to the soft portfolio allocation. In automatic runs, `TEST` is approved only by the active automation or standing-approval profile explicitly allowing authority experiments. Otherwise hold it for article-specific user approval.
 
@@ -28,7 +30,7 @@ Official primary-source timeliness can support Discover current interest. It doe
 
 A verified `EDITORIAL_BREAKOUT` can support Discover current interest when the primary source, independent coverage or community velocity, broad reader consequence and visual story all pass. It cannot satisfy a Search-first provider minimum and cannot create `REALTIME_HOT`.
 
-The user-approved premium/business strategy is candidate-pool and portfolio guidance only. It cannot satisfy any provider minimum. A `PREMIUM_DECISION_CORE` candidate still needs the same Search-first, Discover-first or Authority-first evidence as any other candidate.
+The permanent brand-mindset gate is an eligibility prerequisite, not a demand provider. A `CORE_MINDSPACE` or `QUALIFIED_ADJACENT` candidate still needs the same Search-first, Discover-first or Authority-first evidence as any other candidate. `HOLD`, `REJECT` and `UNQUALIFIED` rows never enter scoring.
 
 Provider independence is evaluated by acquisition-system family. Provider aliases, a `current_interest` signal derived from the same Keyword Planner artifact, or multiple views of one GSC export remain one family. The scorer may retain same-family supporting context, but it may not create an additional Search-demand provider.
 
@@ -44,19 +46,37 @@ Provider independence is evaluated by acquisition-system family. Provider aliase
 | Original information gain | 10 |
 | VERTU right to win | 5 |
 
-Every non-market dimension uses a bounded `score_100` plus at least one evidence reference and observation time. The reusable scorer calculates the weighted final score:
+Every non-market production dimension uses a bounded `score_100` plus at least one evidence reference and observation time. Before the reusable scorer, run the central 32-factor extractor:
+
+```bash
+python3 ${VERTU_PDCA_ROOT}/scripts/vertu_content_factor_extractor.py \
+  --input candidates.json \
+  --output candidates-with-factors.json \
+  --summary factor-extraction.json \
+  --keyword-planner keyword-planner-expansion.json \
+  --targeted-gsc targeted-gsc-demand.json \
+  --realtime-trends realtime-trends.json \
+  --source-velocity source-velocity.json \
+  --sanity-inventory sanity-inventory.json
+```
+
+Then calculate the weighted production and shadow outputs:
 
 ```bash
 python3 ${VERTU_PDCA_ROOT}/scripts/vertu_content_traffic_gate.py score \
-  --input candidates.json \
+  --input candidates-with-factors.json \
   --output traffic-demand.json \
   --max-articles 10 \
-  --trend-mode realtime_hot
+  --trend-mode realtime_hot \
+  --require-brand-mindset-gate \
+  --brand-mindset-profile recovery
 ```
 
-Selection requires computed score at least 80, `STRONG` or approved `TEST` demand verdict, no validation error, and no veto. A per-run script must never supply the final score.
+Selection requires a valid brand-mindset `PASS`, computed score at least 80, `STRONG` or approved `TEST` demand verdict, no validation error, and no veto. A per-run script must never supply the final score.
 
 The active scorer emits `score_source=computed_v3_12_0`, `positive_demand_provider_families`, `demand_signal_qualifications` and one selected market-demand score per qualified family. Preserve these fields in `traffic-demand.json`; provider labels alone are not evidence of independence.
+
+It also emits `direct_factor_model` using `content-factor-model-v1` and `computed_factor_v1_shadow`. This flat 32-factor diagnostic requires raw values and provenance, rejects candidate-authored `score_100`, reports applicable and available weighted coverage, and cannot change the production score, demand verdict, vetoes, eligibility, selection priority or portfolio. Coverage below 70% is `INSUFFICIENT_FACTOR_COVERAGE` and suppresses the diagnostic score. Read `direct-factor-model.md` completely before preparing candidate inputs.
 
 For historical VERTU/GSC fit, reward the exact or adjacent reader cluster and decision pattern, not the presence of premium vocabulary. Evidence that commercial-airline cabin decisions performed well does not automatically support private aviation, generic hotels, yachts or all luxury travel. Preserve the narrowest supported boundary.
 
@@ -94,15 +114,17 @@ Use average monthly searches, geography, language, network, competition, and obs
 
 Inspect result types, current top-result freshness and authority, and whether VERTU already satisfies the intent. Reject duplicate intent, cannibalisation without a consolidation plan, angles that only differ by date or wording, and `no_defensible_content_gap` candidates that add no concrete information gain.
 
+The scoring-stage observation is not the final writing benchmark. After a candidate passes the unchanged production scorer, apply `serp-benchmark.md` to the exact selected query, market, language and device. The post-selection benchmark may return the candidate to scoring or require replacement, but it never edits the already computed score.
+
 ## Portfolio selection
 
 Use these soft targets after every candidate independently passes:
 
-- about 50% proven or adjacent demand;
-- about 30% rising current interest;
-- up to 20% controlled exploration or VERTU authority.
+- recovery: about 80% `CORE_MINDSPACE`, no more than 20% `QUALIFIED_ADJACENT`;
+- stable: 60–80% core, no more than 40% adjacent;
+- automatic exploration: zero.
 
-Keep no more than three articles dominated by one entity, reject duplicate intent, preserve meaningful topic diversity, and keep automatic content out of `news` and `/news/`. `max_articles` is normally a ceiling. The named `vertu-10` profile is the explicit exception: it expands the candidate pool and replaces downstream blockers until ten articles pass, while this traffic gate remains unchanged. If bounded supply is exhausted below ten, report `DAILY_QUOTA_BLOCKED`; never manufacture eligibility or `NO_TOPIC` success.
+Keep no more than three articles dominated by one entity, reject duplicate intent, preserve meaningful topic diversity, and keep automatic content out of `news` and `/news/`. `max_articles` is normally a ceiling. The named `vertu-10` profile is the explicit exception: it applies the two-phase current-interest then evergreen supply contract in `evergreen-quota-fallback.md` and replaces downstream blockers until ten articles pass, while this traffic gate remains unchanged. Only exhausted two-phase supply or a truthful hard blocker may return `DAILY_QUOTA_BLOCKED`; never manufacture eligibility or `NO_TOPIC` success.
 
 When enough candidates independently pass, prefer roughly 50–70% `PREMIUM_DECISION_CORE` across at least three distinct clusters, 20–30% `ADJACENT`, and no more than 20% `EXPLORATION`. This preference is applied after normal eligibility and before final portfolio ordering; it never creates a score adjustment.
 

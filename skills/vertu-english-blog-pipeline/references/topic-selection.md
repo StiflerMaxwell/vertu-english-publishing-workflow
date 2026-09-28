@@ -1,4 +1,4 @@
-# Topic Selection Contract — Traffic Acquisition v3.14.0
+# Topic Selection Contract — Traffic Acquisition v3.20.0
 
 Topic selection is the highest-leverage stage. The goal is a current or durable reader need where VERTU can add a credible, distinctive perspective and where real performance evidence supports Discover or Search opportunity.
 
@@ -8,13 +8,23 @@ When GSC access is available, read the previous 365 days of finalised Discover a
 
 Use historical performance as evidence, not a template. Do not clone a successful article, repeat the same intent, or infer causality from one spike.
 
+## Bounded Discover recovery profile
+
+After the finalised baseline and before broad candidate creation, read `discover-recovery-profile.md` and the active pointer it governs. A valid `ACTIVE` profile is an explicitly user-approved editorial strategy, not a learned performance prior.
+
+When active, shape the serious candidate pool around VERTU-relevant decision/comparison intents and executive AI, privacy, security and mobile decisions. Keep a bounded verified current-event discovery lane and controlled exploration lane. Exclude generic household, kitchen, mattress and weakly related wellbeing directions from the default recovery pool. Apply category cooldowns only as pool-construction guidance; an exact intent with material new evidence may re-enter the normal gate.
+
+The profile never changes `computed_v3_12_0`, demand providers, trend classes, the permanent brand-mindset eligibility gate, vetoes or `selection_priority_score`. Its mix is not a selected-article or publication quota. Record the profile fingerprint and pre-score mapping before any candidate result is known. Expired, invalid, inactive or unavailable profile evidence has zero effect.
+
+## Permanent brand-mindset eligibility
+
+Read `brand-mindset-gate.md` completely. Before any traffic score is calculated, require explicit audience-overlap, mindset-overlap and VERTU editorial-right-to-win evidence. At least two dimensions must pass and no permanent conflict may exist. Classify valid rows as `CORE_MINDSPACE | QUALIFIED_ADJACENT`; ambiguous or missing evidence is `HOLD`, and commodity mismatch or forced/price-only relevance is `REJECT`.
+
+This prerequisite can remove a candidate from scoring but contributes zero points. A high score, trend, YouTube/D2TR signal, prior or quota cannot rescue it. Automatic exploration is disabled.
+
 ## VERTU audience-market fit
 
-Apply the user's standing editorial strategy before broad candidate expansion. Classify each serious candidate:
-
-- `PREMIUM_DECISION_CORE`: a mass-recognisable premium, business, executive or collector subject with a concrete choice and demonstrated VERTU audience adjacency;
-- `ADJACENT`: relevant to the same audience but with weaker historical fit, narrower recognition or a less direct decision;
-- `EXPLORATION`: outside proven VERTU clusters and therefore eligible only as a controlled test after the normal demand gate passes. Before demand validation, record it as `EXPLORATION_CANDIDATE`; do not imply that it has earned a test slot.
+Apply the user's standing editorial strategy before broad candidate expansion. Map every passing candidate to `CORE_MINDSPACE` or `QUALIFIED_ADJACENT` with the permanent semantic evidence contract. Do not create an automatic exploration lane.
 
 Core examples include commercial-airline cabins and airport services, executive phones/privacy/business technology, watches/collecting/craft, and familiar luxury-purchase comparisons. These examples guide candidate creation; they are not pre-approved topics.
 
@@ -39,6 +49,7 @@ Keep historical audience fit separate from candidate-level demand. A successful 
 - the mandatory same-day Hermes RSS and editorial-synthesis chain defined in `editorial-intelligence.md`;
 - Cipher's current hot-topic feed, when available;
 - primary AI/LLM/technology announcements;
+- official YouTube Data API or reproducible YouTube exports for audience language and creator velocity, governed by `youtube-topic-signals.md`;
 - research papers and official technical documentation;
 - cyber.fund and high-quality essays with an original framework;
 - current search demand and content-performance evidence;
@@ -53,9 +64,9 @@ Do not select from a headline alone. Open the primary source and establish what 
 
 ## Candidate-level traffic evidence
 
-Read `traffic-demand-gate.md` and `realtime-trends.md` completely. The 365-day baseline establishes audience fit but does not select an individual topic. Every serious candidate must preserve its own GSC, trend/current-interest, Keyword Planner when authorised, SERP, inventory and cluster-support evidence with source status and fetch time.
+Read `brand-mindset-gate.md`, `traffic-demand-gate.md`, `direct-factor-model.md`, `realtime-trends.md` and `youtube-topic-signals.md` completely. The 365-day baseline establishes audience fit but does not select an individual topic. Every serious candidate must first carry a fingerprint-valid `brand-mindset-fit-v1` `PASS`, then preserve its own GSC, trend/current-interest, Keyword Planner when authorised, SERP, inventory and cluster-support evidence with source status and fetch time. Run the central factor extractor over the complete passing serious-candidate pool before traffic scoring; require exactly 32 explicit evidence rows per candidate and preserve `factor-extraction.json`. The shadow factor output never changes current production eligibility. YouTube is a separate shadow-only discovery source and adds no direct-factor row or score in v3.20.0.
 
-Every candidate must also declare `REALTIME_HOT`, `RISING_SEARCH` or `EVERGREEN_SEARCH`, plus the relevant markets, and one pre-gate audience-fit lane from `PREMIUM_DECISION_CORE | ADJACENT | EXPLORATION_CANDIDATE`. Only verified official Google Trends evidence observed within 24 hours may support `REALTIME_HOT`.
+Every candidate must also declare `REALTIME_HOT`, `RISING_SEARCH` or `EVERGREEN_SEARCH`, plus the relevant markets and its pre-score `CORE_MINDSPACE | QUALIFIED_ADJACENT` gate class. Only verified official Google Trends evidence observed within 24 hours may support `REALTIME_HOT`.
 
 Separately record `EDITORIAL_BREAKOUT | CURRENT_CONFIRMED | NONE`. A verified editorial breakout can satisfy the current-interest portion of a Discover-first candidate, but it is never a Google demand provider and does not change the candidate's Google trend class.
 
@@ -99,6 +110,10 @@ Reject regardless of score:
 - `premium_label_only`: luxury, high-end, business, exclusivity or price is the only audience or traffic rationale;
 - `niche_affluence_without_demand`: a very small affluent service or purchase lacks the normal candidate-level demand evidence required by its lane.
 - `no_defensible_content_gap`: the current result set and VERTU inventory already answer the intent and the proposal adds no concrete information gain.
+- `commodity_lifestyle_mismatch`: the subject is generic household, kitchen, television, sofa, mattress or equivalent commodity content outside VERTU brand mindspace.
+- `forced_brand_association`: brand relevance exists only as a bolted-on VERTU or Concierge paragraph.
+- `price_only_luxury_label`: an expensive/rare claim lacks the required price/transaction plus craft/material/scarcity/ownership evidence.
+- `brand_mindset_evidence_incomplete`: the semantic prerequisite is missing, ambiguous, stale or fingerprint-invalid.
 
 ## Search and content-gap checks
 
@@ -116,7 +131,7 @@ Reject regardless of score:
 
 If the incremental-value sentence is vague, reject or reframe.
 
-Two providers are independent only when they come from different acquisition evidence systems and do not merely repeat the same upstream estimate. Accepted positive Search-first families are candidate-level finalised GSC query/page evidence, official Google Trends comparison evidence, and authorised Google Ads Keyword Planner evidence. Alias labels and derived `current_interest` values from the same Keyword Planner artifact count once. GSC counts only when the newest available finalised window reaches 3 clicks or 100 impressions; a smaller available recent window remains `INSUFFICIENT_SAMPLE` and cannot be replaced by an older window to pass. SERP observations, Hermes/editorial velocity, social engagement, historical cluster adjacency and primary-source timeliness are supporting evidence, not independent Search-demand providers.
+Two providers are independent only when they come from different acquisition evidence systems and do not merely repeat the same upstream estimate. Accepted positive Search-first families are candidate-level finalised GSC query/page evidence, official Google Trends comparison evidence, and authorised Google Ads Keyword Planner evidence. Alias labels and derived `current_interest` values from the same Keyword Planner artifact count once. GSC counts only when the newest available finalised window reaches 3 clicks or 100 impressions; a smaller available recent window remains `INSUFFICIENT_SAMPLE` and cannot be replaced by an older window to pass. SERP observations, Hermes/editorial velocity, YouTube creator/view velocity, social engagement, historical cluster adjacency and primary-source timeliness are supporting evidence, not independent Search-demand providers.
 
 ## Topic brief
 
@@ -164,9 +179,9 @@ Two providers are independent only when they come from different acquisition evi
 ## Automation behaviour
 
 - Score at least three credible candidates when the source pool permits.
-- For a ten-article batch, score at least 30 candidates. The named `vertu-10` profile expands cumulatively to 60, 90 and 120 when required.
+- For a ten-article batch, score at least 30 candidates. The named `vertu-10` profile applies `evergreen-quota-fallback.md`: expand current-interest supply cumulatively to 60, 90 and 120, then start an independent evergreen 30/60/90/120 supply phase when cumulative eligibility remains below ten.
 - Select no more than `max_articles`.
-- Prefer `NO_TOPIC` over a weak article for ordinary profiles. For `vertu-10`, never weaken the topic gate: seek a distinct direction through bounded expansion, then use `DAILY_QUOTA_BLOCKED` if fewer than ten can qualify.
+- Prefer `NO_TOPIC` over a weak article for ordinary profiles. For `vertu-10`, never weaken the topic gate: exhaust the independent current-interest and evergreen phases, then use `DAILY_QUOTA_BLOCKED` only after both bounded pools or a truthful hard blocker prevent ten.
 - Do not repeat the same entity or intent within seven days unless a material event occurred.
 - Package a material event as one event/opportunity page plus no more than two distinct search-intent support pages. Define query boundaries and publish the event page first.
 - Record rejected candidates so later runs do not rediscover the same weak angle without new evidence.
@@ -183,4 +198,4 @@ Use consumer-decision, craft, technology, privacy, travel and VERTU authority la
 
 When enough candidates independently pass, use a soft audience-fit mix of roughly 50–70% `PREMIUM_DECISION_CORE` across at least three distinct clusters, 20–30% `ADJACENT`, and no more than 20% `EXPLORATION`. This mix never lowers the score or demand threshold. A premium-labelled candidate that fails normally remains rejected even when the core allocation is empty.
 
-When `trend_mode: realtime_hot`, consider verified `REALTIME_HOT` candidates first, then `RISING_SEARCH`, before durable evergreen candidates. Do not lower the score threshold or select traffic-only celebrity, sport, politics or general-news topics outside VERTU audience authority. Report the final trend-class distribution without describing the whole portfolio as hot unless the evidence supports it.
+When `trend_mode: realtime_hot`, consider verified `REALTIME_HOT` candidates first, then `RISING_SEARCH`. For `vertu-10`, an insufficient bounded current-interest phase automatically starts the separately fingerprinted `EVERGREEN_FALLBACK` pool; lack of a hot candidate is not a publication blocker. Do not lower the score threshold or select traffic-only celebrity, sport, politics or general-news topics outside VERTU audience authority. Report the final trend-class distribution without describing evergreen work as hot.

@@ -6,16 +6,16 @@ Authorship must improve trust through accurate editorial identity and topic acco
 
 | Sanity author ID | Display name | Primary scope |
 |---|---|---|
-| `author-vertu-buyer-guide-desk` | VERTU Buyer Guide Desk | buyer guides, comparisons, product selection and decision frameworks |
-| `author-vertu-ai-innovation-desk` | VERTU AI & Innovation Desk | AI agents, software, emerging technology and consumer impact |
-| `author-vertu-watch-craft-desk` | VERTU Watch & Craft Desk | watches, craftsmanship, materials, collecting and ownership |
-| `author-vertu-privacy-security-desk` | VERTU Privacy & Security Desk | privacy, secure communications and globally mobile executive risk |
-| `author-vertu-concierge-travel-desk` | VERTU Concierge & Travel Desk | concierge, premium travel, disruption and global mobility |
-| `author-vertu-product-service-desk` | VERTU Product & Service Desk | VERTU products, services, ownership and first-party authority |
+| `${AUTHOR_BUYER_GUIDE_ID}` | VERTU Buyer Guide Desk | buyer guides, comparisons, product selection and decision frameworks |
+| `${AUTHOR_AI_INNOVATION_ID}` | VERTU AI & Innovation Desk | AI agents, software, emerging technology and consumer impact |
+| `${AUTHOR_WATCH_CRAFT_ID}` | VERTU Watch & Craft Desk | watches, craftsmanship, materials, collecting and ownership |
+| `${AUTHOR_PRIVACY_SECURITY_ID}` | VERTU Privacy & Security Desk | privacy, secure communications and globally mobile executive risk |
+| `${AUTHOR_CONCIERGE_TRAVEL_ID}` | VERTU Concierge & Travel Desk | concierge, premium travel, disruption and global mobility |
+| `${AUTHOR_PRODUCT_SERVICE_ID}` | VERTU Product & Service Desk | VERTU products, services, ownership and first-party authority |
 
 The live Sanity author document is authoritative for name, slug, biography and profile URL. Publishing scripts must reference an existing author; they must never create or reshape an author document as a side effect of publishing an article.
 
-`author-vertu-guide-desk` is a legacy compatibility author and is not eligible for new automated assignments.
+`${AUTHOR_GUIDE_ID}` is a legacy compatibility author and is not eligible for new automated assignments.
 
 ## Avatar policy
 
@@ -34,12 +34,12 @@ Author assignment is expertise-first, not random.
 
 Default mappings:
 
-- buyer, comparison, shortlist, how-to-choose → `author-vertu-buyer-guide-desk`;
-- AI model, agent, software, device technology change → `author-vertu-ai-innovation-desk`;
-- watch, leather, gemstone, materials, craft, collector → `author-vertu-watch-craft-desk`;
-- privacy, secure phone, communications, threat model, executive mobility → `author-vertu-privacy-security-desk`;
-- travel, concierge, disruption, access, itinerary, global lifestyle → `author-vertu-concierge-travel-desk`;
-- VERTU product, service, concierge authority, enterprise capability → `author-vertu-product-service-desk`.
+- buyer, comparison, shortlist, how-to-choose → `${AUTHOR_BUYER_GUIDE_ID}`;
+- AI model, agent, software, device technology change → `${AUTHOR_AI_INNOVATION_ID}`;
+- watch, leather, gemstone, materials, craft, collector → `${AUTHOR_WATCH_CRAFT_ID}`;
+- privacy, secure phone, communications, threat model, executive mobility → `${AUTHOR_PRIVACY_SECURITY_ID}`;
+- travel, concierge, disruption, access, itinerary, global lifestyle → `${AUTHOR_CONCIERGE_TRAVEL_ID}`;
+- VERTU product, service, concierge authority, enterprise capability → `${AUTHOR_PRODUCT_SERVICE_ID}`.
 
 For a mixed article, the dominant reader decision wins. A VERTU product mention alone does not force the Product & Service Desk.
 
